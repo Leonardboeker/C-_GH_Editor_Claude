@@ -1070,3 +1070,183 @@ for (int i = 0; i < targetPlanes.Count; i++)
 | Scale(plane, x, y, z) | Plane, 3 doubles | Non-uniform scale |
 | Mirror(plane) | Plane | Reflect across plane |
 | PlaneToPlane(from, to) | Plane, Plane | Reorient coordinate frame |
+
+---
+
+## 24. DataTree Building and Manipulation
+
+DataTree<T> is Grasshopper's branching data structure. Each branch has a GH_Path (an array of integers) and contains a List<T>. Understanding path construction is critical for correct GH data flow.
+
+### Building a DataTree from Scratch
+
+```csharp
+DataTree<Point3d> tree = new DataTree<Point3d>();
+
+for (int i = 0; i < rowCount; i++)
+{
+  GH_Path path = new GH_Path(i);          // Path: {i}
+  List<Point3d> branchData = new List<Point3d>();
+
+  for (int j = 0; j < colCount; j++)
+  {
+    branchData.Add(new Point3d(i, j, 0));
+  }
+
+  tree.AddRange(branchData, path);         // Add entire list to branch
+}
+
+out_tree = tree;
+```
+
+### Multi-Level Paths
+
+Paths can have multiple indices for nested grouping.
+
+```csharp
+DataTree<double> tree = new DataTree<double>();
+
+for (int group = 0; group < groupCount; group++)
+{
+  for (int item = 0; item < itemCount; item++)
+  {
+    GH_Path path = new GH_Path(group, item);  // Path: {group;item}
+    tree.Add(value, path);                      // Add single value
+  }
+}
+```
+
+### Path Construction Reference
+
+```csharp
+// Single-level path
+GH_Path p1 = new GH_Path(0);            // {0}
+GH_Path p2 = new GH_Path(3);            // {3}
+
+// Multi-level paths
+GH_Path p3 = new GH_Path(0, 1);         // {0;1}
+GH_Path p4 = new GH_Path(2, 0, 5);      // {2;0;5}
+
+// From existing path + append
+GH_Path p5 = new GH_Path(existingPath);
+p5 = p5.AppendElement(newIndex);         // Returns new path (immutable)
+
+// From integer array
+int[] indices = new int[] { 1, 2, 3 };
+GH_Path p6 = new GH_Path(indices);      // {1;2;3}
+```
+
+### Safe DataTree Iteration (Rhino 8 Pattern)
+
+NEVER use AllData() on input trees. Always iterate by path:
+
+```csharp
+// Pattern 1: By branch index (most common)
+for (int i = 0; i < tree.BranchCount; i++)
+{
+  GH_Path path = tree.Path(i);
+  List<object> branch = tree.Branch(i);
+  for (int j = 0; j < branch.Count; j++)
+  {
+    // process branch[j]
+  }
+}
+
+// Pattern 2: By path (when you need the path object)
+for (int i = 0; i < tree.BranchCount; i++)
+{
+  GH_Path path = tree.Path(i);
+  List<object> branch = tree.Branch(path);
+  // path.Indices gives int[] of the path components
+}
+```
+
+### Mirroring Input Tree Structure
+
+When transforming a DataTree, preserve the original path structure:
+
+```csharp
+private void RunScript(DataTree<object> inputTree, ref object A)
+{
+  if (inputTree == null || inputTree.BranchCount == 0) return;
+
+  DataTree<Point3d> outputTree = new DataTree<Point3d>();
+
+  for (int i = 0; i < inputTree.BranchCount; i++)
+  {
+    GH_Path path = inputTree.Path(i);        // Keep same path
+    List<object> branch = inputTree.Branch(i);
+    List<Point3d> newBranch = new List<Point3d>();
+
+    for (int j = 0; j < branch.Count; j++)
+    {
+      GH_Point ghPt = branch[j] as GH_Point;
+      if (ghPt != null)
+      {
+        Point3d pt = ghPt.Value;
+        // Transform the point
+        newBranch.Add(new Point3d(pt.X * 2, pt.Y * 2, pt.Z));
+      }
+    }
+
+    outputTree.AddRange(newBranch, path);    // Same path structure
+  }
+
+  A = outputTree;
+}
+```
+
+### DataTree Operations
+
+```csharp
+// Merge two trees (branches with same paths are combined)
+DataTree<double> combined = new DataTree<double>(treeA);
+combined.MergeTree(treeB);
+
+// Flatten (all data into single branch {0})
+DataTree<double> flat = new DataTree<double>(tree);
+flat.Flatten();
+
+// Get all data as flat list (use ONLY on trees you built yourself, not inputs)
+List<double> allData = flat.AllData();
+
+// Check if tree has a specific path
+bool exists = tree.PathExists(new GH_Path(0, 1));
+
+// Get branch count and item count
+int branches = tree.BranchCount;
+int totalItems = tree.DataCount;
+```
+
+### DataTree Properties and Methods Reference
+
+| Property/Method | Returns | Notes |
+|---|---|---|
+| tree.BranchCount | int | Number of branches |
+| tree.DataCount | int | Total items across all branches |
+| tree.Path(i) | GH_Path | Path of branch at index i |
+| tree.Paths | IList<GH_Path> | All paths (for foreach iteration) |
+| tree.Branch(i) | List<T> | Data in branch at index i |
+| tree.Branch(path) | List<T> | Data at specific path |
+| tree.Add(item, path) | void | Add single item to path |
+| tree.AddRange(list, path) | void | Add list of items to path |
+| tree.PathExists(path) | bool | Check if path exists |
+| tree.MergeTree(other) | void | Merge another tree in |
+| tree.Flatten() | void | Collapse all branches to {0} |
+| tree.Clear() | void | Remove all data |
+
+### Filtering DataTree Branches
+
+```csharp
+// Keep only branches that have at least N items
+DataTree<double> filtered = new DataTree<double>();
+
+for (int i = 0; i < tree.BranchCount; i++)
+{
+  GH_Path path = tree.Path(i);
+  List<double> branch = tree.Branch(i);
+  if (branch.Count >= minItems)
+  {
+    filtered.AddRange(branch, path);
+  }
+}
+```
