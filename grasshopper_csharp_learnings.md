@@ -1250,3 +1250,191 @@ for (int i = 0; i < tree.BranchCount; i++)
   }
 }
 ```
+
+---
+
+## 25. KUKAprc Patterns
+
+KUKAprc is the Grasshopper plugin for KUKA robot programming. These patterns cover the most common C# scripting tasks with KUKAprc.
+
+### Reading Axis Values from Analysis Component
+
+The KUKAprc Analysis component outputs "Robot Axis Values" as a DataTree. Structure: one branch per command, 6 values per branch (A1 through A6). Input must be set to Tree access mode.
+
+```csharp
+private void RunScript(
+  DataTree<object> axisValues,
+  ref object A1, ref object A2, ref object A3,
+  ref object A4, ref object A5, ref object A6)
+{
+  if (axisValues == null || axisValues.BranchCount == 0)
+  {
+    this.Component.AddRuntimeMessage(
+      GH_RuntimeMessageLevel.Warning, "No axis values connected");
+    return;
+  }
+
+  List<double> a1 = new List<double>();
+  List<double> a2 = new List<double>();
+  List<double> a3 = new List<double>();
+  List<double> a4 = new List<double>();
+  List<double> a5 = new List<double>();
+  List<double> a6 = new List<double>();
+
+  for (int i = 0; i < axisValues.BranchCount; i++)
+  {
+    List<object> branch = axisValues.Branch(i);
+    if (branch.Count < 6)
+    {
+      this.Component.AddRuntimeMessage(
+        GH_RuntimeMessageLevel.Warning,
+        "Branch " + i.ToString() + " has fewer than 6 values");
+      continue;
+    }
+
+    double val;
+    if (double.TryParse(branch[0].ToString(), out val)) a1.Add(val);
+    if (double.TryParse(branch[1].ToString(), out val)) a2.Add(val);
+    if (double.TryParse(branch[2].ToString(), out val)) a3.Add(val);
+    if (double.TryParse(branch[3].ToString(), out val)) a4.Add(val);
+    if (double.TryParse(branch[4].ToString(), out val)) a5.Add(val);
+    if (double.TryParse(branch[5].ToString(), out val)) a6.Add(val);
+  }
+
+  A1 = a1; A2 = a2; A3 = a3;
+  A4 = a4; A5 = a5; A6 = a6;
+}
+```
+
+### KUKAprc Analysis Component Outputs
+
+| Output | Type | Description |
+|---|---|---|
+| Robot Axis Values | DataTree (6 per branch) | Joint angles A1-A6 in degrees |
+| Collision | List<bool> or DataTree | Collision detected per command |
+| Reachability | List<bool> or DataTree | Target reachable per command |
+| Planes | List<Plane> | TCP planes per command |
+| Time | List<double> | Time in seconds per command |
+
+### Speed List Parallel to Planes
+
+When building KUKAprc toolpaths, the speed list must have exactly the same count as the plane list. Always add speed and plane together:
+
+```csharp
+private void RunScript(
+  List<Plane> inputPlanes,
+  double approachSpeed,
+  double workSpeed,
+  double retractSpeed,
+  ref object planes,
+  ref object speeds)
+{
+  if (inputPlanes == null || inputPlanes.Count == 0) return;
+
+  List<Plane> outPlanes = new List<Plane>();
+  List<double> outSpeeds = new List<double>();
+
+  // Approach: first plane at approach speed
+  outPlanes.Add(inputPlanes[0]);
+  outSpeeds.Add(approachSpeed);
+
+  // Work: all planes at work speed
+  for (int i = 0; i < inputPlanes.Count; i++)
+  {
+    outPlanes.Add(inputPlanes[i]);
+    outSpeeds.Add(workSpeed);
+  }
+
+  // Retract: last plane lifted, at retract speed
+  Plane retractPlane = new Plane(inputPlanes[inputPlanes.Count - 1]);
+  retractPlane.Transform(Transform.Translation(Vector3d.ZAxis * 50));
+  outPlanes.Add(retractPlane);
+  outSpeeds.Add(retractSpeed);
+
+  // CRITICAL: outPlanes.Count must equal outSpeeds.Count
+  planes = outPlanes;
+  speeds = outSpeeds;
+}
+```
+
+### External Axes (KUKAprc Pro)
+
+KUKAprc Pro supports external axes (E1-E6) for linear tracks and turntables. External axis values may appear as additional values in the Analysis DataTree (positions 6-11 for E1-E6) or as separate outputs depending on the version.
+
+```csharp
+// Reading external axes (if present in Analysis output)
+// Check branch.Count > 6 to detect external axes
+if (branch.Count >= 12)
+{
+  // Positions 6-11 are E1-E6
+  double e1Val;
+  if (double.TryParse(branch[6].ToString(), out e1Val))
+  {
+    e1.Add(e1Val);
+  }
+  // ... repeat for E2-E6 at indices 7-11
+}
+```
+
+NOTE: External axis DataTree structure may vary between KUKAprc versions. Wire a Panel to the Analysis output first to verify the exact structure before writing extraction code.
+
+### Building Toolpath Planes
+
+Common pattern: build planes in a local coordinate frame, then orient to the robot's work position using PlaneToPlane.
+
+```csharp
+private void RunScript(
+  Curve toolpathCurve,
+  Plane workPlane,
+  int divisionCount,
+  Vector3d toolDirection,
+  ref object planes,
+  ref object speeds)
+{
+  if (toolpathCurve == null) return;
+
+  // Divide curve into points
+  Point3d[] divPts;
+  double[] parameters = toolpathCurve.DivideByCount(divisionCount, true, out divPts);
+  if (parameters == null) return;
+
+  List<Plane> outPlanes = new List<Plane>();
+  List<double> outSpeeds = new List<double>();
+
+  for (int i = 0; i < divPts.Length; i++)
+  {
+    // Get tangent for X direction
+    Vector3d tangent = toolpathCurve.TangentAt(parameters[i]);
+    tangent.Unitize();
+
+    // Build tool plane: Z = tool direction, X = tangent
+    Vector3d yAxis = Vector3d.CrossProduct(toolDirection, tangent);
+    yAxis.Unitize();
+    Vector3d xAxis = Vector3d.CrossProduct(yAxis, toolDirection);
+    xAxis.Unitize();
+
+    Plane localPlane = new Plane(divPts[i], xAxis, yAxis);
+
+    // Orient from world to work position
+    Transform orient = Transform.PlaneToPlane(Plane.WorldXY, workPlane);
+    localPlane.Transform(orient);
+
+    outPlanes.Add(localPlane);
+    outSpeeds.Add(100.0);  // mm/s -- always add speed with plane
+  }
+
+  planes = outPlanes;
+  speeds = outSpeeds;
+}
+```
+
+### KUKAprc Checklist
+
+Before sending planes to KUKAprc:
+
+1. Plane count == Speed count -- always, no exceptions
+2. Z-axis points along tool direction -- KUKAprc uses Z as tool axis
+3. No duplicate consecutive planes -- causes zero-distance moves
+4. Check reachability first -- wire to Analysis before running on robot
+5. Units are millimeters -- Rhino model must be in mm
+6. Angles are degrees -- axis values from Analysis are in degrees
