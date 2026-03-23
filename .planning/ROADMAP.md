@@ -6,7 +6,7 @@ Build a comprehensive knowledge base, auto-load rules, and component templates s
 
 ## Phases
 
-- [ ] **Phase 1: Knowledge Base** - Expand grasshopper_csharp_learnings.md with all patterns needed for working Rhino 8 C# scripts
+- [x] **Phase 1: Knowledge Base** - Expand grasshopper_csharp_learnings.md with all patterns needed for working Rhino 8 C# scripts (completed 2026-03-23)
 - [ ] **Phase 2: CLAUDE.md and GSD Integration** - Auto-load rules each session and integrate GSD workflow for scripting tasks
 - [ ] **Phase 3: Component Templates** - Create ready-to-paste templates for geometry, KUKAprc, DataTree, and Galapagos components
 
@@ -40,9 +40,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 02-01: Write CLAUDE.md with per-session rules and output format requirements
-- [ ] 02-02: Add GSD workflow guidance to CLAUDE.md
-- [ ] 02-03: Copy expanded knowledge base to project root and verify file placement
+- [ ] 02-01-PLAN.md — Create CLAUDE.md with auto-load rules (CL-01) and output format (CL-02)
+- [ ] 02-02-PLAN.md — Append GSD workflow guidance section to CLAUDE.md (CL-03)
+- [ ] 02-03-PLAN.md — Verify file placement and CLAUDE.md completeness (all CL requirements)
 
 ### Phase 3: Component Templates
 **Goal**: Create standalone, ready-to-paste component templates for the three main use cases.
