@@ -1843,3 +1843,154 @@ private void RunScript(
   out_count = result.Count;
 }
 ```
+
+---
+
+## 28. Parallel Processing
+
+Use `System.Threading.Tasks.Parallel.For` to speed up independent operations on large collections. Works inside the C# Script component on Rhino 8 (.NET 7+).
+
+### When to Use Parallel Processing
+
+Use `Parallel.For` when:
+- Processing 100+ items independently
+- Each item does significant work (geometry ops, not simple math)
+- Order of results does not matter OR you pre-allocate by index
+
+Do NOT use when:
+- Items depend on each other
+- Collection is small (<50 items)
+- You need to modify shared state without thread-safe collections
+
+### Pattern 1: Pre-Allocated Array (Ordered Results)
+
+Safest pattern. Each thread writes to its own index.
+
+```csharp
+using System.Threading.Tasks;
+
+// Pre-allocate result array with same size as input
+Point3d[] results = new Point3d[points.Count];
+
+Parallel.For(0, points.Count, i =>
+{
+  // Each thread gets its own index -- no shared writes
+  double t;
+  curve.ClosestPoint(points[i], out t);
+  results[i] = curve.PointAt(t);
+});
+
+// Convert to list for GH output
+out_points = new List<Point3d>(results);
+```
+
+### Pattern 2: ConcurrentBag (Unordered Results)
+
+Use when result order does not matter.
+
+```csharp
+using System.Threading.Tasks;
+using System.Collections.Concurrent;
+
+ConcurrentBag<Point3d> bag = new ConcurrentBag<Point3d>();
+
+Parallel.For(0, points.Count, i =>
+{
+  double t;
+  if (curve.ClosestPoint(points[i], out t))
+  {
+    bag.Add(curve.PointAt(t));
+  }
+  // Items that fail ClosestPoint are simply not added
+});
+
+out_points = bag.ToList();
+// WARNING: bag.ToList() order is NOT the same as input order
+```
+
+### Pattern 3: ConcurrentDictionary (Keyed Results)
+
+Use when you need to track which input produced which output.
+
+```csharp
+using System.Threading.Tasks;
+using System.Collections.Concurrent;
+
+ConcurrentDictionary<int, double> distances = new ConcurrentDictionary<int, double>();
+
+Parallel.For(0, points.Count, i =>
+{
+  double t;
+  if (curve.ClosestPoint(points[i], out t))
+  {
+    Point3d closest = curve.PointAt(t);
+    double dist = points[i].DistanceTo(closest);
+    distances.TryAdd(i, dist);
+  }
+});
+
+// Reconstruct ordered list
+List<double> result = new List<double>();
+for (int i = 0; i < points.Count; i++)
+{
+  double val;
+  if (distances.TryGetValue(i, out val))
+  {
+    result.Add(val);
+  }
+  else
+  {
+    result.Add(-1.0);  // Sentinel for failed items
+  }
+}
+out_distances = result;
+```
+
+### Thread Safety Rules
+
+1. RhinoCommon geometry is thread-safe for READS. You can call `curve.ClosestPoint()`, `brep.IsPointInside()`, etc. from multiple threads.
+2. Do NOT create new Rhino document objects in parallel threads. `RhinoDoc.ActiveDoc` is not thread-safe.
+3. Do NOT use standard `List<T>` for writes in parallel. Use `ConcurrentBag<T>`, `ConcurrentDictionary<K,V>`, or pre-allocated arrays.
+4. Do NOT use `DataTree<T>` inside `Parallel.For`. DataTree is not thread-safe. Build the tree after parallel processing.
+5. Input parameters must be List Access. `Parallel.For` needs the full list available inside RunScript.
+
+### Building DataTree After Parallel Processing
+
+```csharp
+// Step 1: Parallel compute (array-based)
+Point3d[] closestPts = new Point3d[points.Count];
+double[] distances = new double[points.Count];
+
+Parallel.For(0, points.Count, i =>
+{
+  double t;
+  curve.ClosestPoint(points[i], out t);
+  closestPts[i] = curve.PointAt(t);
+  distances[i] = points[i].DistanceTo(closestPts[i]);
+});
+
+// Step 2: Build DataTree sequentially (NOT thread-safe)
+DataTree<Point3d> ptTree = new DataTree<Point3d>();
+DataTree<double> distTree = new DataTree<double>();
+
+for (int i = 0; i < points.Count; i++)
+{
+  GH_Path path = new GH_Path(i);
+  ptTree.Add(closestPts[i], path);
+  distTree.Add(distances[i], path);
+}
+
+out_points = ptTree;
+out_distances = distTree;
+```
+
+### Required Namespaces
+
+```csharp
+using System.Threading.Tasks;               // Parallel.For, Parallel.ForEach
+using System.Collections.Concurrent;         // ConcurrentBag, ConcurrentDictionary
+```
+
+### Performance Notes
+
+`Parallel.For` has startup overhead (~1-2ms). Not worth it for <50 items. Best speedup: geometry queries on large point sets (ClosestPoint, IsPointInside). The Script component may run slower than a compiled .gha for `Parallel.For` due to JIT overhead, but still faster than serial for large sets. Profile with Stopwatch (see Section 26) before and after parallelization.
