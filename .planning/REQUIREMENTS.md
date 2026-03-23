@@ -13,8 +13,8 @@
 - [x] **KB-04**: KUKAprc-specific patterns: reading axis values from DataTree, speed lists, external axes
 - [x] **KB-05**: Input/output patterns: null guards, ref object outputs, access mode table
 - [x] **KB-06**: Debugging patterns: `AddRuntimeMessage`, `Print`, runtime error prevention
-- [ ] **KB-07**: Parallel processing patterns with `System.Threading.Tasks.Parallel.For`
-- [ ] **KB-08**: Complete minimal template and category-specific templates embedded in the doc
+- [x] **KB-07**: Parallel processing patterns with `System.Threading.Tasks.Parallel.For`
+- [x] **KB-08**: Complete minimal template and category-specific templates embedded in the doc
 
 ### Auto-Load Rules (CLAUDE.md)
 

@@ -27,7 +27,7 @@ Plans:
 - [x] 01-02: Add geometry operation patterns (curves, surfaces, breps, intersections, vectors)
 - [x] 01-03: Add KUKAprc and DataTree patterns (axis input, speed lists, path iteration)
 - [x] 01-04: Add debugging and error handling patterns (AddRuntimeMessage, runtime guards)
-- [ ] 01-05: Add performance patterns and embed all component templates
+- [x] 01-05: Add performance patterns and embed all component templates
 
 ### Phase 2: CLAUDE.md and GSD Integration
 **Goal**: Auto-load the knowledge base rules every session and document the GSD workflow for managing scripting tasks.
