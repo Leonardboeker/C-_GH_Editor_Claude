@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 01-04
+current_plan: 01-05
 status: executing
-last_updated: "2026-03-23T03:00:40.943Z"
+last_updated: "2026-03-23T03:05:32.536Z"
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 5
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # STATE.md — GH C# Editor Toolkit
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Phase
 
 **Phase 1** -- Knowledge Base (Expanded)
-Status: Executing Phase 01, Plan 04 next
+Status: Executing Phase 01, Plan 05 next
 
-Current Plan: 01-04
-Completed Plans: 01-01, 01-02, 01-03
+Current Plan: 01-05
+Completed Plans: 01-01, 01-02, 01-03, 01-04
 
 ## Completed Phases
 
@@ -42,6 +42,8 @@ Completed Plans: 01-01, 01-02, 01-03
 - DataTree iteration examples use for-loop with BranchCount, never AllData() on inputs
 - KUKAprc external axes documented as version-dependent with Panel verification recommendation
 - AllData() usage restricted to self-built trees only, with explicit warning comment
+- Used this.Component.AddRuntimeMessage (SDK-Mode) consistently across all debugging examples
+- Structured guard template with defaults-before-guards pattern to prevent null downstream outputs
 
 ## Performance Metrics
 
@@ -50,7 +52,8 @@ Completed Plans: 01-01, 01-02, 01-03
 | 01 | 01 | 3min | 2 | 1 |
 | 01 | 02 | 3min | 2 | 1 |
 | 01 | 03 | 2min | 2 | 1 |
+| 01 | 04 | 2min | 2 | 1 |
 
 ## Last Action
 
-Completed 01-03-PLAN.md (DataTree and KUKAprc patterns) -- 2026-03-23T02:59:41Z
+Completed 01-04-PLAN.md (Debugging and error handling patterns) -- 2026-03-23T03:04:41Z
