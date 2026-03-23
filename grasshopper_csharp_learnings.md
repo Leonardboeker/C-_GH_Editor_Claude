@@ -1438,3 +1438,151 @@ Before sending planes to KUKAprc:
 4. Check reachability first -- wire to Analysis before running on robot
 5. Units are millimeters -- Rhino model must be in mm
 6. Angles are degrees -- axis values from Analysis are in degrees
+
+---
+
+## 26. Debugging and Runtime Messages
+
+### AddRuntimeMessage
+
+The primary way to communicate errors and warnings from a C# Script component. Messages appear as colored bubbles on the component in the GH canvas. Access via `this.Component` inside SDK-Mode RunScript:
+
+```csharp
+// Error (red) -- component stops, downstream receives null
+this.Component.AddRuntimeMessage(
+  GH_RuntimeMessageLevel.Error, "Input curve is null");
+
+// Warning (orange) -- component runs, output may be partial
+this.Component.AddRuntimeMessage(
+  GH_RuntimeMessageLevel.Warning, "3 of 10 points were out of range");
+
+// Remark (gray) -- informational, no visual alarm
+this.Component.AddRuntimeMessage(
+  GH_RuntimeMessageLevel.Remark, "Processing 42 points");
+```
+
+### Message Level Guide
+
+| Level | Color | When to Use | Component Behavior |
+|---|---|---|---|
+| Error | Red | Input missing, impossible operation, unrecoverable | Stops, outputs null |
+| Warning | Orange | Partial failure, skipped items, degraded result | Runs, outputs partial |
+| Remark | Gray | Statistics, progress info, non-critical notes | Runs normally |
+
+### When to Use Each Level
+
+**Error** -- use when the script CANNOT produce any meaningful output:
+
+```csharp
+if (curve == null)
+{
+  this.Component.AddRuntimeMessage(
+    GH_RuntimeMessageLevel.Error, "No curve connected");
+  return;
+}
+```
+
+**Warning** -- use when the script CAN run but some inputs are problematic:
+
+```csharp
+int skipped = 0;
+for (int i = 0; i < points.Count; i++)
+{
+  double t;
+  if (!curve.ClosestPoint(points[i], out t))
+  {
+    skipped++;
+    continue;
+  }
+  result.Add(curve.PointAt(t));
+}
+if (skipped > 0)
+{
+  this.Component.AddRuntimeMessage(
+    GH_RuntimeMessageLevel.Warning,
+    skipped.ToString() + " of " + points.Count.ToString() + " points failed ClosestPoint");
+}
+```
+
+**Remark** -- use for counts, timing, or diagnostic info:
+
+```csharp
+this.Component.AddRuntimeMessage(
+  GH_RuntimeMessageLevel.Remark,
+  "Processed " + result.Count.ToString() + " items in " + branches.ToString() + " branches");
+```
+
+### Print() for Debug Output
+
+Print() writes to the component's special [out] text output parameter. Useful during development; remove or reduce for production scripts.
+
+```csharp
+// Simple text
+Print("Curve length: " + curve.GetLength().ToString("F2"));
+
+// Formatted (like string.Format)
+Print("Point {0}: ({1:F2}, {2:F2}, {3:F2})", i, pt.X, pt.Y, pt.Z);
+
+// Loop diagnostics
+for (int i = 0; i < 5 && i < points.Count; i++)
+{
+  Print("points[" + i.ToString() + "] = " + points[i].ToString());
+}
+```
+
+### RhinoApp.WriteLine() for Command History
+
+Writes to Rhino's command-line history window. Useful for logging that persists across component updates (Print() gets overwritten each solve).
+
+```csharp
+Rhino.RhinoApp.WriteLine("DEBUG: RunScript iteration " + Iteration.ToString());
+Rhino.RhinoApp.WriteLine("DEBUG: Tree has " + tree.BranchCount.ToString() + " branches");
+```
+
+### Debugging Workflow
+
+When a script produces unexpected results, follow this sequence:
+
+**Step 1 - Check inputs first.** Print input types and counts:
+
+```csharp
+Print("Input type: " + (inputObj == null ? "null" : inputObj.GetType().ToString()));
+Print("List count: " + myList.Count.ToString());
+Print("Tree branches: " + tree.BranchCount.ToString());
+```
+
+**Step 2 - Check intermediate values.** Print values at each processing step:
+
+```csharp
+Print("After division: " + divPts.Length.ToString() + " points");
+Print("After filtering: " + filtered.Count.ToString() + " remain");
+```
+
+**Step 3 - Check output assignment.** Verify you are assigning the correct variable:
+
+```csharp
+Print("Output list has " + result.Count.ToString() + " items");
+out_result = result;  // Make sure this matches
+```
+
+**Step 4 - Check DataTree structure.** When working with trees:
+
+```csharp
+for (int i = 0; i < Math.Min(3, tree.BranchCount); i++)
+{
+  GH_Path path = tree.Path(i);
+  Print("Branch " + path.ToString() + ": " + tree.Branch(i).Count.ToString() + " items");
+}
+```
+
+### Timing for Performance
+
+```csharp
+System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
+sw.Start();
+
+// ... expensive operation ...
+
+sw.Stop();
+Print("Operation took " + sw.ElapsedMilliseconds.ToString() + " ms");
+```
