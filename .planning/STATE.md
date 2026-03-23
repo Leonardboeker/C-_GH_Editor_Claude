@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 01-05
+current_plan: 2
 status: executing
-last_updated: "2026-03-23T03:10:52.849Z"
+last_updated: "2026-03-23T10:41:53.293Z"
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 8
+  completed_plans: 6
 ---
 
 # STATE.md — GH C# Editor Toolkit
@@ -19,15 +19,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Every C# script Claude writes runs correctly in Rhino 8 Grasshopper on the first try
-**Current focus:** Phase 01 — knowledge-base
+**Current focus:** Phase 02 — claude-md-and-gsd-integration
 
 ## Current Phase
 
-**Phase 1** -- Knowledge Base (Expanded)
-Status: COMPLETE (all 5 plans done)
+**Phase 2** -- CLAUDE.md and GSD Integration
+Status: IN PROGRESS
 
-Current Plan: (phase complete)
-Completed Plans: 01-01, 01-02, 01-03, 01-04, 01-05
+Current Plan: 2
+Completed Plans: 02-01
 
 ## Completed Phases
 
@@ -47,6 +47,9 @@ Completed Plans: 01-01, 01-02, 01-03, 01-04, 01-05
 - Three distinct parallel patterns (array, ConcurrentBag, ConcurrentDictionary) for different result-ordering needs
 - All category templates use SDK-Mode (Script_Instance : GH_ScriptInstance) for consistency
 - Galapagos penalty uses 999999 not double.MaxValue to prevent overflow in Galapagos internals
+- [Phase 02]: Used explicit Read tool instruction instead of @import to avoid inlining 2348 lines into every session
+- [Phase 02]: Wrapped Output Format in <important if> block for stronger C# code generation adherence
+- [Phase 02]: Included 10-rule critical summary as fallback safety net if Claude skips reading the full knowledge base
 
 ## Performance Metrics
 
@@ -57,7 +60,8 @@ Completed Plans: 01-01, 01-02, 01-03, 01-04, 01-05
 | 01 | 03 | 2min | 2 | 1 |
 | 01 | 04 | 2min | 2 | 1 |
 | 01 | 05 | 2min | 2 | 1 |
+| Phase 02 P01 | 1min | 1 tasks | 1 files |
 
 ## Last Action
 
-Completed 01-05-PLAN.md (Parallel processing and category templates) -- 2026-03-23T03:09:46Z
+Completed 02-01-PLAN.md (CLAUDE.md with auto-load rules and output format) -- 2026-03-23T10:40:27Z
