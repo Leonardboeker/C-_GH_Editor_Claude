@@ -24,10 +24,10 @@
 
 ### Component Templates
 
-- [ ] **TPL-01**: Geometry processing template (curve ops, surface eval, brep intersection)
-- [ ] **TPL-02**: KUKAprc toolpath template (plane list output, speed list, DataTree axis input)
-- [ ] **TPL-03**: DataTree processing template (path iteration, branching output, filtering)
-- [ ] **TPL-04**: Galapagos fitness template (NaN guard, single number output)
+- [x] **TPL-01**: Geometry processing template (curve ops, surface eval, brep intersection)
+- [x] **TPL-02**: KUKAprc toolpath template (plane list output, speed list, DataTree axis input)
+- [x] **TPL-03**: DataTree processing template (path iteration, branching output, filtering)
+- [x] **TPL-04**: Galapagos fitness template (NaN guard, single number output)
 
 ## v2 Requirements
 
