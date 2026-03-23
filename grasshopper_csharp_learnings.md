@@ -2001,6 +2001,8 @@ using System.Collections.Concurrent;         // ConcurrentBag, ConcurrentDiction
 
 Copy-paste starting point for scripts that process curves, surfaces, or breps. Includes null guards, curve operations, and intersection handling.
 
+Standalone file: `templates/geometry_processing.cs`
+
 ```csharp
 using System;
 using System.Collections;
@@ -2088,6 +2090,8 @@ Outputs: out_points, out_distances, out_count.
 ## 30. Template -- KUKAprc Toolpath
 
 Copy-paste starting point for scripts that generate robot toolpaths. Outputs plane list and matching speed list for KUKAprc.
+
+Standalone file: `templates/kukaprc_toolpath.cs`
 
 ```csharp
 using System;
@@ -2202,6 +2206,8 @@ KUKAprc wiring: Connect planes to KUKA|prc Core Movements input, speeds to Speed
 
 Copy-paste starting point for scripts that read, transform, and output DataTrees. Preserves input tree structure in output.
 
+Standalone file: `templates/datatree_processing.cs`
+
 ```csharp
 using System;
 using System.Collections;
@@ -2286,6 +2292,8 @@ Important: The inputTree parameter MUST be set to Tree access mode in GH.
 ## 32. Template -- Galapagos Fitness
 
 Copy-paste starting point for Galapagos optimization fitness functions. Must output a single number. NaN protection is critical.
+
+Standalone file: `templates/galapagos_fitness.cs`
 
 ```csharp
 using System;
