@@ -584,3 +584,230 @@ When Claude writes a C# script for Grasshopper, always output the complete
 SDK-Mode class including `using` statements, class declaration, and `RunScript`.
 The user pastes the entire class into the new Script Editor.
 Never output just the method body -- the new editor expects a full class.
+
+---
+
+## 20. Curve Operations
+
+Common curve methods from RhinoCommon. All return values must be null-checked.
+
+### Curve.ClosestPoint
+
+Returns the parameter `t` on the curve nearest to a test point.
+
+```csharp
+double t;
+bool success = curve.ClosestPoint(testPoint, out t);
+if (success)
+{
+  Point3d closestPt = curve.PointAt(t);
+  Vector3d tangent = curve.TangentAt(t);
+}
+```
+
+### Curve.DivideByCount
+
+Divides curve into N equal segments. Returns parameters AND points.
+
+```csharp
+Point3d[] divPts;
+double[] parameters = curve.DivideByCount(segmentCount, true, out divPts);
+if (parameters == null || divPts == null)
+{
+  this.Component.AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Division failed");
+  return;
+}
+// divPts.Length == segmentCount + 1 (includes both endpoints)
+// parameters[i] is the curve parameter at divPts[i]
+```
+
+### Curve.DivideByLength
+
+Divides curve by a fixed chord length. Point count depends on curve length.
+
+```csharp
+Point3d[] divPts;
+double[] parameters = curve.DivideByLength(segmentLength, true, out divPts);
+if (parameters == null)
+{
+  this.Component.AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Division failed");
+  return;
+}
+// Point count = floor(curveLength / segmentLength) + 1 approximately
+```
+
+### Curve.Offset
+
+Returns `Curve[]` (array), never a single curve. Kinks and self-intersections produce multiple segments.
+
+```csharp
+Curve[] offsetCurves = curve.Offset(
+  Plane.WorldXY,                    // offset plane
+  distance,                          // positive = one side, negative = other
+  0.01,                              // tolerance (or doc.ModelAbsoluteTolerance)
+  CurveOffsetCornerStyle.Sharp);     // Sharp, Round, Smooth, Chamfer, None
+
+if (offsetCurves != null && offsetCurves.Length > 0)
+{
+  // Simple case: take first result
+  Curve single = offsetCurves[0];
+
+  // Complex case: join all segments
+  Curve[] joined = Curve.JoinCurves(offsetCurves, 0.01);
+}
+```
+
+### Curve.JoinCurves (Static Method)
+
+Joins multiple curves into fewer continuous curves.
+
+```csharp
+Curve[] joined = Curve.JoinCurves(inputCurves, 0.01);
+if (joined != null)
+{
+  // joined.Length may be less than inputCurves count
+  // Check joined[0].IsClosed if you need a closed result
+}
+```
+
+### Curve.Trim
+
+Trims curve to a parameter subdomain. Returns null if domain is invalid.
+
+```csharp
+Curve trimmed = curve.Trim(t0, t1);
+if (trimmed != null)
+{
+  // trimmed runs from parameter t0 to t1
+}
+```
+
+### Curve.Extend
+
+Extends curve from one or both ends by a length.
+
+```csharp
+Curve extended = curve.Extend(
+  CurveEnd.Both,                   // CurveEnd.Start, .End, or .Both
+  extensionLength,
+  CurveExtensionStyle.Line);       // Line, Arc, or Smooth
+```
+
+### Curve Properties Quick Reference
+
+| Property/Method | Returns | Notes |
+|---|---|---|
+| curve.GetLength() | double | Total arc length |
+| curve.PointAtStart | Point3d | Start point |
+| curve.PointAtEnd | Point3d | End point |
+| curve.PointAt(t) | Point3d | Point at parameter t |
+| curve.TangentAt(t) | Vector3d | Tangent vector at t |
+| curve.CurvatureAt(t) | Vector3d | Curvature vector at t |
+| curve.Domain | Interval | Parameter domain (min, max) |
+| curve.IsClosed | bool | True if start == end |
+| curve.IsPlanar() | bool | True if curve lies in a plane |
+| curve.Degree | int | NURBS degree |
+
+---
+
+## 21. Brep Operations
+
+Breps (Boundary Representations) are the most common solid geometry type in Rhino. A Brep has Faces, Edges, and Vertices.
+
+### Brep.ClosestPoint (Extended Overload)
+
+Returns closest point, surface parameters, component index, and surface normal. Always use this when you need more than just the point.
+
+```csharp
+Point3d closestPt;
+ComponentIndex ci;
+double s, t;
+Vector3d normal;
+bool found = brep.ClosestPoint(
+  testPoint,
+  out closestPt,
+  out ci,           // which face/edge/vertex
+  out s,            // surface U parameter
+  out t,            // surface V parameter
+  double.MaxValue,  // maximum search distance
+  out normal);      // surface normal at closest point
+
+if (found)
+{
+  // closestPt is the closest point on the brep
+  // ci.ComponentIndexType tells you if it hit a Face, Edge, or Vertex
+  // s, t are the UV parameters on the face (if ci is a face)
+  // normal is the outward-facing surface normal
+}
+```
+
+### Brep.ClosestPoint (Simple Overload)
+
+Use when you only need the point.
+
+```csharp
+Point3d closestPt = brep.ClosestPoint(testPoint);
+// No success check -- returns the input point on failure (rare)
+```
+
+### Brep.IsPointInside
+
+Tests if a point is inside a closed, manifold brep. Only valid for closed solids.
+
+```csharp
+// IMPORTANT: Check that the brep is solid first
+if (!brep.IsSolid)
+{
+  this.Component.AddRuntimeMessage(
+    GH_RuntimeMessageLevel.Warning, "Brep is not solid -- cannot test containment");
+  return;
+}
+
+bool inside = brep.IsPointInside(testPoint, RhinoMath.SqrtEpsilon, false);
+// Third param: strictlyIn (false = on boundary counts as inside)
+```
+
+### BrepFace Normal at a Point
+
+Gets the surface normal at the closest point on a specific face. Must check OrientationIsReversed.
+
+```csharp
+BrepFace face = brep.Faces[faceIndex];
+double u, v;
+if (face.ClosestPoint(testPoint, out u, out v))
+{
+  Vector3d normal = face.NormalAt(u, v);
+  if (face.OrientationIsReversed)
+    normal.Reverse();
+  // normal now points outward from the brep
+}
+```
+
+### Iterating Brep Faces
+
+```csharp
+for (int i = 0; i < brep.Faces.Count; i++)
+{
+  BrepFace face = brep.Faces[i];
+  Interval uDom = face.Domain(0);
+  Interval vDom = face.Domain(1);
+  double uMid = uDom.Mid;
+  double vMid = vDom.Mid;
+  Point3d center = face.PointAt(uMid, vMid);
+  Vector3d normal = face.NormalAt(uMid, vMid);
+  if (face.OrientationIsReversed) normal.Reverse();
+}
+```
+
+### Brep Properties Quick Reference
+
+| Property/Method | Returns | Notes |
+|---|---|---|
+| brep.Faces | BrepFaceList | All faces of the brep |
+| brep.Edges | BrepEdgeList | All edges |
+| brep.Vertices | BrepVertexList | All vertices |
+| brep.IsSolid | bool | True if closed manifold |
+| brep.IsManifold | bool | True if manifold |
+| brep.GetArea() | double | Total surface area |
+| brep.GetVolume() | double | Volume (only valid if IsSolid) |
+| brep.GetBoundingBox(true) | BoundingBox | World-axis bounding box |
