@@ -57,7 +57,7 @@ Plans:
 Plans:
 - [x] 03-01-PLAN.md — Create geometry processing + KUKAprc toolpath templates (TPL-01, TPL-02)
 - [x] 03-02-PLAN.md — Create DataTree processing + Galapagos fitness templates (TPL-03, TPL-04)
-- [ ] 03-03-PLAN.md — Add cross-reference links from knowledge base to template files
+- [x] 03-03-PLAN.md — Add cross-reference links from knowledge base to template files
 
 ---
 *Roadmap created: 2026-03-23*
