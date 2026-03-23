@@ -1586,3 +1586,260 @@ sw.Start();
 sw.Stop();
 Print("Operation took " + sw.ElapsedMilliseconds.ToString() + " ms");
 ```
+
+---
+
+## 27. Runtime Error Prevention
+
+Defensive patterns that prevent crashes and null outputs. Every RunScript should use these guards appropriate to its inputs.
+
+### Null Geometry Guards
+
+```csharp
+// Single geometry input
+if (curve == null)
+{
+  this.Component.AddRuntimeMessage(
+    GH_RuntimeMessageLevel.Error, "No curve connected");
+  return;
+}
+
+// List input -- check for null list AND empty list
+if (points == null || points.Count == 0)
+{
+  this.Component.AddRuntimeMessage(
+    GH_RuntimeMessageLevel.Error, "No points connected");
+  return;
+}
+
+// DataTree input
+if (tree == null || tree.BranchCount == 0)
+{
+  this.Component.AddRuntimeMessage(
+    GH_RuntimeMessageLevel.Error, "No data in tree");
+  return;
+}
+```
+
+### Numeric Guards
+
+```csharp
+// Division by zero
+if (Math.Abs(divisor) < 1e-10)
+{
+  this.Component.AddRuntimeMessage(
+    GH_RuntimeMessageLevel.Error, "Divisor is zero");
+  return;
+}
+
+// Negative or zero where positive required
+if (radius <= 0)
+{
+  this.Component.AddRuntimeMessage(
+    GH_RuntimeMessageLevel.Error, "Radius must be positive");
+  return;
+}
+
+// NaN guard (critical for Galapagos fitness)
+if (double.IsNaN(value) || double.IsInfinity(value))
+{
+  value = 999999.0;  // Safe fallback
+  this.Component.AddRuntimeMessage(
+    GH_RuntimeMessageLevel.Warning, "NaN detected, using fallback");
+}
+```
+
+### Range and Index Guards
+
+```csharp
+// Index bounds
+if (index < 0 || index >= list.Count)
+{
+  this.Component.AddRuntimeMessage(
+    GH_RuntimeMessageLevel.Error,
+    "Index " + index.ToString() + " out of range (0-" + (list.Count - 1).ToString() + ")");
+  return;
+}
+
+// Matching list lengths (e.g., planes and speeds)
+if (planes.Count != speeds.Count)
+{
+  this.Component.AddRuntimeMessage(
+    GH_RuntimeMessageLevel.Error,
+    "Plane count (" + planes.Count.ToString() + ") != speed count (" + speeds.Count.ToString() + ")");
+  return;
+}
+
+// Minimum list length
+if (points.Count < 3)
+{
+  this.Component.AddRuntimeMessage(
+    GH_RuntimeMessageLevel.Error, "Need at least 3 points");
+  return;
+}
+```
+
+### Geometry Validity Checks
+
+```csharp
+// Curve validity
+if (!curve.IsValid)
+{
+  this.Component.AddRuntimeMessage(
+    GH_RuntimeMessageLevel.Warning, "Input curve is invalid");
+  return;
+}
+
+// Brep solidity (required for IsPointInside)
+if (!brep.IsSolid)
+{
+  this.Component.AddRuntimeMessage(
+    GH_RuntimeMessageLevel.Warning, "Brep is not solid");
+  return;
+}
+
+// Vector length (avoid division by zero in Unitize)
+if (vec.Length < 1e-10)
+{
+  this.Component.AddRuntimeMessage(
+    GH_RuntimeMessageLevel.Warning, "Vector is zero-length");
+  return;
+}
+vec.Unitize();
+
+// Plane validity
+if (plane.XAxis.Length < 1e-10 || plane.YAxis.Length < 1e-10)
+{
+  this.Component.AddRuntimeMessage(
+    GH_RuntimeMessageLevel.Error, "Degenerate plane (zero-length axis)");
+  return;
+}
+```
+
+### Safe Type Casting
+
+```csharp
+// Safe cast with null check (preferred over direct cast)
+Curve crv = obj as Curve;
+if (crv == null)
+{
+  this.Component.AddRuntimeMessage(
+    GH_RuntimeMessageLevel.Warning,
+    "Item " + i.ToString() + " is not a Curve (type: " + obj.GetType().Name + ")");
+  continue;
+}
+
+// For GH wrapper types from DataTree<object>
+GH_Point ghPt = branch[j] as GH_Point;
+if (ghPt == null)
+{
+  this.Component.AddRuntimeMessage(
+    GH_RuntimeMessageLevel.Warning,
+    "Branch " + i.ToString() + " item " + j.ToString() + " is not a Point");
+  continue;
+}
+Point3d pt = ghPt.Value;
+```
+
+### Method Return Value Checks
+
+Many RhinoCommon methods return null or false on failure. Always check before using the result.
+
+```csharp
+// Curve.ClosestPoint
+double t;
+if (!curve.ClosestPoint(testPoint, out t))
+{
+  this.Component.AddRuntimeMessage(
+    GH_RuntimeMessageLevel.Warning, "ClosestPoint failed for point " + i.ToString());
+  continue;
+}
+
+// Curve.DivideByCount
+Point3d[] divPts;
+double[] parameters = curve.DivideByCount(count, true, out divPts);
+if (parameters == null || divPts == null)
+{
+  this.Component.AddRuntimeMessage(
+    GH_RuntimeMessageLevel.Error, "Curve division failed");
+  return;
+}
+
+// Curve.Offset
+Curve[] offsetResult = curve.Offset(plane, dist, tol, cornerStyle);
+if (offsetResult == null || offsetResult.Length == 0)
+{
+  this.Component.AddRuntimeMessage(
+    GH_RuntimeMessageLevel.Warning, "Curve offset produced no result");
+  return;
+}
+
+// Intersection.CurveCurve
+CurveIntersections events = Intersection.CurveCurve(crvA, crvB, 0.001, 0.0);
+if (events == null || events.Count == 0)
+{
+  this.Component.AddRuntimeMessage(
+    GH_RuntimeMessageLevel.Remark, "No intersections found");
+}
+```
+
+### Complete Guard Pattern Template
+
+Standard opening for any RunScript with common input types:
+
+```csharp
+private void RunScript(
+  Curve curve, List<Point3d> points, double value,
+  ref object out_result, ref object out_count)
+{
+  // Defaults (prevent null outputs on early return)
+  out_result = new List<Point3d>();
+  out_count = 0;
+
+  // Null guards
+  if (curve == null)
+  {
+    this.Component.AddRuntimeMessage(
+      GH_RuntimeMessageLevel.Error, "No curve connected");
+    return;
+  }
+  if (points == null || points.Count == 0)
+  {
+    this.Component.AddRuntimeMessage(
+      GH_RuntimeMessageLevel.Error, "No points connected");
+    return;
+  }
+  if (!curve.IsValid)
+  {
+    this.Component.AddRuntimeMessage(
+      GH_RuntimeMessageLevel.Warning, "Curve is invalid");
+    return;
+  }
+
+  // Processing
+  List<Point3d> result = new List<Point3d>();
+  int skipped = 0;
+
+  for (int i = 0; i < points.Count; i++)
+  {
+    double t;
+    if (!curve.ClosestPoint(points[i], out t))
+    {
+      skipped++;
+      continue;
+    }
+    result.Add(curve.PointAt(t));
+  }
+
+  if (skipped > 0)
+  {
+    this.Component.AddRuntimeMessage(
+      GH_RuntimeMessageLevel.Warning,
+      skipped.ToString() + " points failed");
+  }
+
+  // Output assignment
+  out_result = result;
+  out_count = result.Count;
+}
+```
