@@ -811,3 +811,262 @@ for (int i = 0; i < brep.Faces.Count; i++)
 | brep.GetArea() | double | Total surface area |
 | brep.GetVolume() | double | Volume (only valid if IsSolid) |
 | brep.GetBoundingBox(true) | BoundingBox | World-axis bounding box |
+
+---
+
+## 22. Intersection Patterns
+
+All intersection methods live in `Rhino.Geometry.Intersect.Intersection` (static class). Add `using Rhino.Geometry.Intersect;` to use them.
+
+### Intersection.CurveCurve
+
+Returns CurveIntersections (a collection of IntersectionEvent objects). Do NOT treat as Point3d array.
+
+```csharp
+using Rhino.Geometry.Intersect;
+
+CurveIntersections events = Intersection.CurveCurve(
+  curveA, curveB,
+  0.001,   // intersection tolerance
+  0.0);    // overlap tolerance
+
+if (events != null)
+{
+  List<Point3d> intersectionPts = new List<Point3d>();
+  for (int i = 0; i < events.Count; i++)
+  {
+    IntersectionEvent ev = events[i];
+    if (ev.IsOverlap)
+    {
+      // Overlap region: ev.PointA and ev.PointA2 are endpoints
+      // ev.OverlapA is the Interval on curveA
+    }
+    else
+    {
+      // Transverse intersection: single point
+      intersectionPts.Add(ev.PointA);
+      // ev.ParameterA = parameter on curveA
+      // ev.ParameterB = parameter on curveB
+    }
+  }
+}
+```
+
+### IntersectionEvent Properties
+
+| Property | Type | Description |
+|---|---|---|
+| PointA | Point3d | Intersection point on curve A |
+| PointB | Point3d | Intersection point on curve B (same as PointA for transverse) |
+| ParameterA | double | Parameter on curve A |
+| ParameterB | double | Parameter on curve B |
+| IsOverlap | bool | True if curves overlap (not just cross) |
+| OverlapA | Interval | Parameter range of overlap on curve A |
+| OverlapB | Interval | Parameter range of overlap on curve B |
+| PointA2 | Point3d | End point of overlap on curve A (if IsOverlap) |
+| PointB2 | Point3d | End point of overlap on curve B (if IsOverlap) |
+
+### Intersection.CurveSurface
+
+Same return type as CurveCurve, same iteration pattern.
+
+```csharp
+CurveIntersections events = Intersection.CurveSurface(
+  curve, surface,
+  0.001,   // tolerance
+  0.0);    // overlap tolerance
+
+if (events != null)
+{
+  for (int i = 0; i < events.Count; i++)
+  {
+    Point3d pt = events[i].PointA;
+    double curveParam = events[i].ParameterA;
+  }
+}
+```
+
+### Intersection.CurveBrep
+
+Different return type: two separate arrays (overlap curves AND intersection points).
+
+```csharp
+Curve[] overlapCurves;
+Point3d[] intersectionPoints;
+bool success = Intersection.CurveBrep(
+  curve, brep, 0.001,
+  out overlapCurves,
+  out intersectionPoints);
+
+// IMPORTANT: Check both arrays for null independently
+if (intersectionPoints != null && intersectionPoints.Length > 0)
+{
+  for (int i = 0; i < intersectionPoints.Length; i++)
+  {
+    Point3d pt = intersectionPoints[i];
+  }
+}
+if (overlapCurves != null && overlapCurves.Length > 0)
+{
+  for (int i = 0; i < overlapCurves.Length; i++)
+  {
+    Curve crv = overlapCurves[i];
+  }
+}
+```
+
+### Intersection.BrepBrep
+
+Returns intersection curves and points where two breps meet.
+
+```csharp
+Curve[] intersectionCurves;
+Point3d[] intersectionPoints;
+bool success = Intersection.BrepBrep(
+  brepA, brepB, 0.001,
+  out intersectionCurves,
+  out intersectionPoints);
+
+if (success && intersectionCurves != null)
+{
+  // intersectionCurves are the curves where surfaces intersect
+  // intersectionPoints are isolated tangent points (rare)
+}
+```
+
+### Intersection.LinePlane
+
+Quick line-plane intersection test.
+
+```csharp
+double lineParam;
+bool success = Intersection.LinePlane(line, plane, out lineParam);
+if (success)
+{
+  Point3d hitPt = line.PointAt(lineParam);
+}
+```
+
+### Intersection.PlanePlanePlane
+
+Find the point where three planes meet.
+
+```csharp
+Point3d meetPt;
+bool success = Intersection.PlanePlanePlane(planeA, planeB, planeC, out meetPt);
+```
+
+### Intersection Method Summary
+
+| Method | Returns | Out Params | Use Case |
+|---|---|---|---|
+| CurveCurve | CurveIntersections | none | Two curves crossing |
+| CurveSurface | CurveIntersections | none | Curve hitting a surface |
+| CurveBrep | bool | Curve[], Point3d[] | Curve hitting a solid |
+| BrepBrep | bool | Curve[], Point3d[] | Two solids intersecting |
+| LinePlane | bool | double (line param) | Line-plane hit test |
+| PlanePlanePlane | bool | Point3d | Three-plane meet point |
+
+---
+
+## 23. Transform Operations
+
+Transforms modify geometry in place (for mutable types) or return new geometry. For planes and points, Transform modifies in place. For curves and breps, use .DuplicateXxx() first to keep the original.
+
+### Creating Transforms
+
+```csharp
+// Translation
+Transform move = Transform.Translation(new Vector3d(dx, dy, dz));
+Transform move2 = Transform.Translation(Vector3d.ZAxis * height);
+
+// Rotation (angle in radians, axis, center point)
+Transform rotate = Transform.Rotation(
+  RhinoMath.ToRadians(angleDeg),
+  Vector3d.ZAxis,
+  centerPoint);
+
+// Rotation from one direction to another
+Transform reorient = Transform.Rotation(
+  fromDirection,    // Vector3d
+  toDirection,      // Vector3d
+  centerPoint);     // Point3d
+
+// Uniform scale
+Transform scale = Transform.Scale(centerPoint, factor);
+
+// Non-uniform scale
+Transform scaleNU = Transform.Scale(
+  Plane.WorldXY,    // scale relative to this plane
+  xFactor, yFactor, zFactor);
+
+// Mirror across a plane
+Transform mirror = Transform.Mirror(mirrorPlane);
+
+// Plane-to-plane orientation (most useful for robotics)
+Transform orient = Transform.PlaneToPlane(sourcePlane, targetPlane);
+```
+
+### Applying Transforms
+
+```csharp
+// Points (value type) -- returns new point
+Point3d movedPt = new Point3d(pt);
+movedPt.Transform(xform);
+
+// Planes (value type) -- modifies in place
+Plane pln = new Plane(originalPlane);
+pln.Transform(xform);
+
+// Curves (reference type) -- duplicate first to keep original
+Curve movedCurve = curve.DuplicateCurve();
+movedCurve.Transform(xform);
+
+// Breps (reference type) -- duplicate first to keep original
+Brep movedBrep = brep.DuplicateBrep();
+movedBrep.Transform(xform);
+```
+
+### Combining Transforms
+
+Multiply transforms to chain them. Order matters (right to left application).
+
+```csharp
+// First rotate, then move (multiply in reverse order)
+Transform combined = move * rotate;
+
+// Apply the combined transform once
+Plane result = new Plane(sourcePlane);
+result.Transform(combined);
+```
+
+### PlaneToPlane (Most Common for Robotics)
+
+Maps geometry from one coordinate frame to another. Essential for KUKAprc toolpath generation.
+
+```csharp
+// Build geometry at origin
+Plane local = Plane.WorldXY;
+Point3d localPt = new Point3d(10, 0, 5);
+
+// Orient to each target plane
+for (int i = 0; i < targetPlanes.Count; i++)
+{
+  Transform orient = Transform.PlaneToPlane(local, targetPlanes[i]);
+  Point3d worldPt = new Point3d(localPt);
+  worldPt.Transform(orient);
+  result.Add(worldPt);
+}
+```
+
+### Transform Quick Reference
+
+| Method | Parameters | Use Case |
+|---|---|---|
+| Translation(Vector3d) | Direction + distance | Move geometry |
+| Rotation(angle, axis, center) | Radians, Vector3d, Point3d | Rotate around axis |
+| Rotation(from, to, center) | Vector3d, Vector3d, Point3d | Align one direction to another |
+| Scale(center, factor) | Point3d, double | Uniform scale |
+| Scale(plane, x, y, z) | Plane, 3 doubles | Non-uniform scale |
+| Mirror(plane) | Plane | Reflect across plane |
+| PlaneToPlane(from, to) | Plane, Plane | Reorient coordinate frame |
