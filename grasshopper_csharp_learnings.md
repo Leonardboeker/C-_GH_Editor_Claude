@@ -1994,3 +1994,355 @@ using System.Collections.Concurrent;         // ConcurrentBag, ConcurrentDiction
 ### Performance Notes
 
 `Parallel.For` has startup overhead (~1-2ms). Not worth it for <50 items. Best speedup: geometry queries on large point sets (ClosestPoint, IsPointInside). The Script component may run slower than a compiled .gha for `Parallel.For` due to JIT overhead, but still faster than serial for large sets. Profile with Stopwatch (see Section 26) before and after parallelization.
+
+---
+
+## 29. Template -- Geometry Processing
+
+Copy-paste starting point for scripts that process curves, surfaces, or breps. Includes null guards, curve operations, and intersection handling.
+
+```csharp
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Drawing;
+
+using Rhino;
+using Rhino.Geometry;
+using Rhino.Geometry.Intersect;
+
+using Grasshopper;
+using Grasshopper.Kernel;
+using Grasshopper.Kernel.Data;
+using Grasshopper.Kernel.Types;
+
+public class Script_Instance : GH_ScriptInstance
+{
+  private void RunScript(
+    Curve curve,
+    List<Point3d> points,
+    double tolerance,
+    ref object out_points,
+    ref object out_distances,
+    ref object out_count)
+  {
+    // Defaults
+    out_points = new List<Point3d>();
+    out_distances = new List<double>();
+    out_count = 0;
+
+    // Guards
+    if (curve == null)
+    {
+      this.Component.AddRuntimeMessage(
+        GH_RuntimeMessageLevel.Error, "No curve connected");
+      return;
+    }
+    if (points == null || points.Count == 0)
+    {
+      this.Component.AddRuntimeMessage(
+        GH_RuntimeMessageLevel.Error, "No points connected");
+      return;
+    }
+    if (tolerance <= 0) tolerance = 0.01;
+
+    // Processing
+    List<Point3d> resultPts = new List<Point3d>();
+    List<double> resultDist = new List<double>();
+    int skipped = 0;
+
+    for (int i = 0; i < points.Count; i++)
+    {
+      double t;
+      if (!curve.ClosestPoint(points[i], out t))
+      {
+        skipped++;
+        continue;
+      }
+      Point3d closestPt = curve.PointAt(t);
+      double dist = points[i].DistanceTo(closestPt);
+      resultPts.Add(closestPt);
+      resultDist.Add(dist);
+    }
+
+    if (skipped > 0)
+    {
+      this.Component.AddRuntimeMessage(
+        GH_RuntimeMessageLevel.Warning,
+        skipped.ToString() + " points failed ClosestPoint");
+    }
+
+    // Output
+    out_points = resultPts;
+    out_distances = resultDist;
+    out_count = resultPts.Count;
+  }
+}
+```
+
+Inputs to configure in GH: curve (Item), points (List), tolerance (Item, default 0.01).
+Outputs: out_points, out_distances, out_count.
+
+---
+
+## 30. Template -- KUKAprc Toolpath
+
+Copy-paste starting point for scripts that generate robot toolpaths. Outputs plane list and matching speed list for KUKAprc.
+
+```csharp
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Drawing;
+
+using Rhino;
+using Rhino.Geometry;
+
+using Grasshopper;
+using Grasshopper.Kernel;
+using Grasshopper.Kernel.Data;
+using Grasshopper.Kernel.Types;
+
+public class Script_Instance : GH_ScriptInstance
+{
+  private void RunScript(
+    Curve toolpathCurve,
+    Plane workPlane,
+    int divisions,
+    double approachHeight,
+    double approachSpeed,
+    double workSpeed,
+    ref object planes,
+    ref object speeds)
+  {
+    // Defaults
+    planes = new List<Plane>();
+    speeds = new List<double>();
+
+    // Guards
+    if (toolpathCurve == null)
+    {
+      this.Component.AddRuntimeMessage(
+        GH_RuntimeMessageLevel.Error, "No toolpath curve connected");
+      return;
+    }
+    if (divisions < 2) divisions = 10;
+    if (approachHeight <= 0) approachHeight = 50.0;
+    if (approachSpeed <= 0) approachSpeed = 200.0;
+    if (workSpeed <= 0) workSpeed = 100.0;
+
+    // Divide curve into points
+    Point3d[] divPts;
+    double[] parameters = toolpathCurve.DivideByCount(divisions, true, out divPts);
+    if (parameters == null || divPts == null)
+    {
+      this.Component.AddRuntimeMessage(
+        GH_RuntimeMessageLevel.Error, "Curve division failed");
+      return;
+    }
+
+    List<Plane> outPlanes = new List<Plane>();
+    List<double> outSpeeds = new List<double>();
+
+    // Approach plane (above first point)
+    Plane approachPlane = new Plane(workPlane);
+    approachPlane.Transform(
+      Transform.Translation(workPlane.ZAxis * approachHeight));
+    outPlanes.Add(approachPlane);
+    outSpeeds.Add(approachSpeed);
+
+    // Work planes along curve
+    for (int i = 0; i < divPts.Length; i++)
+    {
+      Vector3d tangent = toolpathCurve.TangentAt(parameters[i]);
+      tangent.Unitize();
+
+      // Build plane: origin at point, Z along work plane normal
+      Vector3d zAxis = workPlane.ZAxis;
+      Vector3d yAxis = Vector3d.CrossProduct(zAxis, tangent);
+      yAxis.Unitize();
+      if (yAxis.Length < 1e-10)
+      {
+        yAxis = workPlane.YAxis;
+      }
+      Vector3d xAxis = Vector3d.CrossProduct(yAxis, zAxis);
+      xAxis.Unitize();
+
+      Plane toolPlane = new Plane(divPts[i], xAxis, yAxis);
+      outPlanes.Add(toolPlane);
+      outSpeeds.Add(workSpeed);
+    }
+
+    // Retract plane (above last point)
+    Plane retractPlane = new Plane(workPlane);
+    retractPlane.Origin = divPts[divPts.Length - 1];
+    retractPlane.Transform(
+      Transform.Translation(workPlane.ZAxis * approachHeight));
+    outPlanes.Add(retractPlane);
+    outSpeeds.Add(approachSpeed);
+
+    this.Component.AddRuntimeMessage(
+      GH_RuntimeMessageLevel.Remark,
+      outPlanes.Count.ToString() + " planes, " + outSpeeds.Count.ToString() + " speeds");
+
+    // CRITICAL: plane count must equal speed count
+    planes = outPlanes;
+    speeds = outSpeeds;
+  }
+}
+```
+
+Inputs: toolpathCurve (Item), workPlane (Item), divisions (Item, int), approachHeight (Item, 50), approachSpeed (Item, 200), workSpeed (Item, 100).
+Outputs: planes, speeds.
+KUKAprc wiring: Connect planes to KUKA|prc Core Movements input, speeds to Speed input.
+
+---
+
+## 31. Template -- DataTree Processing
+
+Copy-paste starting point for scripts that read, transform, and output DataTrees. Preserves input tree structure in output.
+
+```csharp
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Drawing;
+
+using Rhino;
+using Rhino.Geometry;
+
+using Grasshopper;
+using Grasshopper.Kernel;
+using Grasshopper.Kernel.Data;
+using Grasshopper.Kernel.Types;
+
+public class Script_Instance : GH_ScriptInstance
+{
+  private void RunScript(
+    DataTree<object> inputTree,
+    double factor,
+    ref object out_tree,
+    ref object out_counts)
+  {
+    // Defaults
+    out_tree = new DataTree<double>();
+    out_counts = new List<int>();
+
+    // Guards
+    if (inputTree == null || inputTree.BranchCount == 0)
+    {
+      this.Component.AddRuntimeMessage(
+        GH_RuntimeMessageLevel.Error, "No data in input tree");
+      return;
+    }
+
+    DataTree<double> resultTree = new DataTree<double>();
+    List<int> branchCounts = new List<int>();
+
+    // Process each branch
+    for (int i = 0; i < inputTree.BranchCount; i++)
+    {
+      GH_Path path = inputTree.Path(i);
+      List<object> branch = inputTree.Branch(i);
+      List<double> newBranch = new List<double>();
+
+      for (int j = 0; j < branch.Count; j++)
+      {
+        double val;
+        if (double.TryParse(branch[j].ToString(), out val))
+        {
+          newBranch.Add(val * factor);
+        }
+        else
+        {
+          this.Component.AddRuntimeMessage(
+            GH_RuntimeMessageLevel.Warning,
+            "Cannot parse value at branch " + i.ToString() + " index " + j.ToString());
+        }
+      }
+
+      resultTree.AddRange(newBranch, path);  // Preserve original path
+      branchCounts.Add(newBranch.Count);
+    }
+
+    this.Component.AddRuntimeMessage(
+      GH_RuntimeMessageLevel.Remark,
+      "Processed " + inputTree.BranchCount.ToString() + " branches, "
+      + resultTree.DataCount.ToString() + " total items");
+
+    // Output
+    out_tree = resultTree;
+    out_counts = branchCounts;
+  }
+}
+```
+
+Inputs: inputTree (Tree access -- right-click to set), factor (Item, default 1.0).
+Outputs: out_tree, out_counts.
+Important: The inputTree parameter MUST be set to Tree access mode in GH.
+
+---
+
+## 32. Template -- Galapagos Fitness
+
+Copy-paste starting point for Galapagos optimization fitness functions. Must output a single number. NaN protection is critical.
+
+```csharp
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Drawing;
+
+using Rhino;
+using Rhino.Geometry;
+
+using Grasshopper;
+using Grasshopper.Kernel;
+using Grasshopper.Kernel.Data;
+using Grasshopper.Kernel.Types;
+
+public class Script_Instance : GH_ScriptInstance
+{
+  private void RunScript(
+    double gene1,
+    double gene2,
+    int geneInt,
+    ref object fitness)
+  {
+    // Default (high penalty = bad)
+    fitness = 999999.0;
+
+    // Map integer gene to binary choice
+    double angle = (geneInt == 0) ? -180.0 : 180.0;
+
+    // Compute fitness components
+    double distanceScore = Math.Abs(gene1 - 50.0);    // Minimize distance from target
+    double angleScore = Math.Abs(gene2 - angle);       // Minimize angle error
+
+    // Weighted combination (lower is better for minimization)
+    double total = distanceScore * 100.0 + angleScore * 50.0;
+
+    // CRITICAL: NaN guard -- Galapagos crashes on NaN
+    if (double.IsNaN(total) || double.IsInfinity(total))
+    {
+      this.Component.AddRuntimeMessage(
+        GH_RuntimeMessageLevel.Warning, "NaN detected in fitness");
+      total = 999999.0;
+    }
+
+    fitness = total;
+  }
+}
+```
+
+Inputs: gene1 (Number Slider), gene2 (Number Slider), geneInt (Integer Slider 0-1).
+Outputs: fitness (single number).
+
+### Galapagos Setup Checklist
+
+1. Genome: Connect Number Sliders or Integer Sliders DIRECTLY to inputs -- do not use intermediate components or Remote Receivers
+2. Fitness: Connect the single fitness output to Galapagos fitness input
+3. Direction: Set Galapagos to "Minimize" if lower fitness = better
+4. NaN guard: Always include -- even if your formula "cannot" produce NaN, edge cases in geometry operations can
+5. Integer genes for binary choices: Use Integer Slider 0-1, map in script
+6. Penalty values: Use a large number (999999) not double.MaxValue (MaxValue can cause overflow in Galapagos internals)
