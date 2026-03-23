@@ -8,9 +8,9 @@
 ### Knowledge Base
 
 - [x] **KB-01**: `grasshopper_csharp_learnings.md` covers all critical compiler rules (ASCII-only, no `out var`, no While loops)
-- [ ] **KB-02**: Full DataTree iteration patterns for Rhino 8 (path-based, not `AllData()`)
+- [x] **KB-02**: Full DataTree iteration patterns for Rhino 8 (path-based, not `AllData()`)
 - [x] **KB-03**: Geometry operation patterns: curves, surfaces, breps, intersections, transforms
-- [ ] **KB-04**: KUKAprc-specific patterns: reading axis values from DataTree, speed lists, external axes
+- [x] **KB-04**: KUKAprc-specific patterns: reading axis values from DataTree, speed lists, external axes
 - [x] **KB-05**: Input/output patterns: null guards, ref object outputs, access mode table
 - [ ] **KB-06**: Debugging patterns: `AddRuntimeMessage`, `Print`, runtime error prevention
 - [ ] **KB-07**: Parallel processing patterns with `System.Threading.Tasks.Parallel.For`

@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 01-03
+current_plan: 01-04
 status: executing
-last_updated: "2026-03-23T02:54:07Z"
+last_updated: "2026-03-23T03:00:40.943Z"
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 5
-  completed_plans: 2
+  completed_plans: 3
 ---
 
 # STATE.md — GH C# Editor Toolkit
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-03-23)
 ## Current Phase
 
 **Phase 1** -- Knowledge Base (Expanded)
-Status: Executing Phase 01, Plan 03 next
+Status: Executing Phase 01, Plan 04 next
 
-Current Plan: 01-03
-Completed Plans: 01-01, 01-02
+Current Plan: 01-04
+Completed Plans: 01-01, 01-02, 01-03
 
 ## Completed Phases
 
@@ -39,6 +39,9 @@ Completed Plans: 01-01, 01-02
 - Listed prohibited characters by description rather than showing actual non-ASCII chars
 - All intersection examples show full IntersectionEvent iteration with IsOverlap check, not simplified point extraction
 - Transform section distinguishes value types from reference types for Transform application
+- DataTree iteration examples use for-loop with BranchCount, never AllData() on inputs
+- KUKAprc external axes documented as version-dependent with Panel verification recommendation
+- AllData() usage restricted to self-built trees only, with explicit warning comment
 
 ## Performance Metrics
 
@@ -46,7 +49,8 @@ Completed Plans: 01-01, 01-02
 |-------|------|----------|-------|-------|
 | 01 | 01 | 3min | 2 | 1 |
 | 01 | 02 | 3min | 2 | 1 |
+| 01 | 03 | 2min | 2 | 1 |
 
 ## Last Action
 
-Completed 01-02-PLAN.md (Geometry operation patterns) -- 2026-03-23T02:54:07Z
+Completed 01-03-PLAN.md (DataTree and KUKAprc patterns) -- 2026-03-23T02:59:41Z
