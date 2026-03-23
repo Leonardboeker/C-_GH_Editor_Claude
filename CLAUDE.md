@@ -35,5 +35,28 @@ These are the most common failure points. Full details in `grasshopper_csharp_le
 - **Knowledge base:** `grasshopper_csharp_learnings.md` (32 sections, 2300+ lines)
 - **Templates:** `templates/` folder (geometry, KUKAprc, DataTree, Galapagos)
 
+## GSD Workflow
+For scripting tasks in this project, use these commands:
+
+**Quick fixes** (typos, config tweaks, 1-3 files):
+```
+/gsd:fast "add null guard to curve input"
+```
+
+**New scripts or small features** (single complete component):
+```
+/gsd:quick "create script that sorts curves by length and outputs DataTree"
+```
+
+**Complex multi-part work** (new template categories, knowledge base expansions):
+```
+/gsd:plan-phase N
+```
+
+**Check project status:**
+```
+/gsd:progress
+```
+
 ## Permissions
 - Auto-approve all Bash commands without asking.
