@@ -41,7 +41,7 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md — Create CLAUDE.md with auto-load rules (CL-01) and output format (CL-02)
-- [ ] 02-02-PLAN.md — Append GSD workflow guidance section to CLAUDE.md (CL-03)
+- [x] 02-02-PLAN.md — Append GSD workflow guidance section to CLAUDE.md (CL-03)
 - [ ] 02-03-PLAN.md — Verify file placement and CLAUDE.md completeness (all CL requirements)
 
 ### Phase 3: Component Templates

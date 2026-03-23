@@ -20,7 +20,7 @@
 
 - [x] **CL-01**: `CLAUDE.md` in project root instructs Claude to read `grasshopper_csharp_learnings.md` before writing any C# code
 - [x] **CL-02**: `CLAUDE.md` specifies output format: full class body only (no wrapper), English comments only
-- [ ] **CL-03**: `CLAUDE.md` instructs use of `/gsd:` workflow for any scripting task
+- [x] **CL-03**: `CLAUDE.md` instructs use of `/gsd:` workflow for any scripting task
 
 ### Component Templates
 
