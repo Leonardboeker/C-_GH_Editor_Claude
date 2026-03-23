@@ -110,6 +110,61 @@ out_planes = result;
 
 Never forget to assign -- an unassigned output gives null silently.
 
+### Multiple Outputs
+
+Each output is a separate `ref object` parameter. Name them with the `out_` prefix
+or short descriptive names matching the GH component output nicknames:
+
+```csharp
+private void RunScript(
+  List<Point3d> points,
+  List<Curve> curves,
+  ref object out_points,
+  ref object out_curves,
+  ref object out_count)
+{
+  if (points == null) return;
+  if (curves == null) return;
+
+  List<Point3d> resultPts = new List<Point3d>();
+  List<Curve> resultCrvs = new List<Curve>();
+
+  // ... processing ...
+
+  // Assign ALL outputs at the end, never inside a loop
+  out_points = resultPts;
+  out_curves = resultCrvs;
+  out_count = resultPts.Count;
+}
+```
+
+### Output Assignment Rules
+
+1. **Assign once at the end** -- never assign `ref object` outputs inside a loop
+2. **Every code path must assign** -- if you `return` early from a guard, the output stays null
+3. **Lists auto-convert** -- `List<Point3d>` assigned to `ref object` automatically becomes a GH list
+4. **DataTree outputs** -- assign `DataTree<T>` directly to `ref object`
+5. **Single values** -- assign directly: `out_value = 42.0;`
+
+### Default Values Before Guards
+
+To prevent null outputs on early return, assign defaults before guards:
+
+```csharp
+private void RunScript(List<Plane> planes, ref object out_planes, ref object out_count)
+{
+  // Defaults -- downstream components get these if guards trigger
+  out_planes = new List<Plane>();
+  out_count = 0;
+
+  if (planes == null || planes.Count == 0) return;
+
+  // ... actual processing ...
+  out_planes = result;
+  out_count = result.Count;
+}
+```
+
 ---
 
 ## 4. Input Access Types
@@ -126,6 +181,84 @@ For KUKAprc Analysis outputs always use **Tree access**:
 ```csharp
 private void RunScript(DataTree<object> axis_values, ...)
 ```
+
+### Access Mode Reference Table
+
+| Access Mode | C# Parameter Type | When to Use | Example Input |
+|---|---|---|---|
+| Item Access | `double`, `int`, `string`, `Point3d`, `Curve` | Single value per execution | Number Slider, one Point |
+| List Access | `List<double>`, `List<Point3d>`, `List<Curve>` | Flat list of values | Series, multiple Points |
+| Tree Access | `DataTree<object>` | Branched data, plugin outputs | KUKAprc Analysis, Entwine |
+
+### Type Casting from Tree Access
+
+Tree access always gives `DataTree<object>`. Cast values inside the loop:
+
+```csharp
+private void RunScript(DataTree<object> tree, ref object A)
+{
+  if (tree == null || tree.BranchCount == 0) return;
+
+  List<double> values = new List<double>();
+
+  for (int i = 0; i < tree.BranchCount; i++)
+  {
+    List<object> branch = tree.Branch(i);
+    for (int j = 0; j < branch.Count; j++)
+    {
+      // Method 1: TryParse (safest for numbers)
+      double val;
+      if (double.TryParse(branch[j].ToString(), out val))
+      {
+        values.Add(val);
+      }
+    }
+  }
+  A = values;
+}
+```
+
+### Casting Geometry from Tree Access
+
+For geometry types, use the GH wrapper's `.Value` property:
+
+```csharp
+// For Point3d from DataTree<object>
+GH_Point ghPt = branch[j] as GH_Point;
+if (ghPt != null)
+{
+  Point3d pt = ghPt.Value;
+}
+
+// For Curve from DataTree<object>
+GH_Curve ghCrv = branch[j] as GH_Curve;
+if (ghCrv != null)
+{
+  Curve crv = ghCrv.Value;
+}
+
+// For Plane from DataTree<object>
+GH_Plane ghPln = branch[j] as GH_Plane;
+if (ghPln != null)
+{
+  Plane pln = ghPln.Value;
+}
+```
+
+### Common Casting Types
+
+| GH Wrapper | `.Value` Type | Use For |
+|---|---|---|
+| `GH_Number` | `double` | Numbers (alternative to TryParse) |
+| `GH_Integer` | `int` | Integers |
+| `GH_Point` | `Point3d` | Points |
+| `GH_Curve` | `Curve` | Curves |
+| `GH_Plane` | `Plane` | Planes |
+| `GH_Surface` | `Surface` | Surfaces |
+| `GH_Brep` | `Brep` | Breps |
+| `GH_Vector` | `Vector3d` | Vectors |
+| `GH_String` | `string` | Strings |
+| `GH_Boolean` | `bool` | Booleans |
 
 ---
 
