@@ -7,7 +7,7 @@ Build a comprehensive knowledge base, auto-load rules, and component templates s
 ## Phases
 
 - [x] **Phase 1: Knowledge Base** - Expand grasshopper_csharp_learnings.md with all patterns needed for working Rhino 8 C# scripts (completed 2026-03-23)
-- [ ] **Phase 2: CLAUDE.md and GSD Integration** - Auto-load rules each session and integrate GSD workflow for scripting tasks
+- [x] **Phase 2: CLAUDE.md and GSD Integration** - Auto-load rules each session and integrate GSD workflow for scripting tasks (completed 2026-03-23)
 - [ ] **Phase 3: Component Templates** - Create ready-to-paste templates for geometry, KUKAprc, DataTree, and Galapagos components
 
 ## Phase Details
@@ -42,23 +42,22 @@ Plans:
 Plans:
 - [x] 02-01-PLAN.md — Create CLAUDE.md with auto-load rules (CL-01) and output format (CL-02)
 - [x] 02-02-PLAN.md — Append GSD workflow guidance section to CLAUDE.md (CL-03)
-- [ ] 02-03-PLAN.md — Verify file placement and CLAUDE.md completeness (all CL requirements)
+- [x] 02-03-PLAN.md — Verify file placement and CLAUDE.md completeness (all CL requirements)
 
 ### Phase 3: Component Templates
-**Goal**: Create standalone, ready-to-paste component templates for the three main use cases.
+**Goal**: Create standalone, ready-to-paste component templates for the four main use cases (geometry, KUKAprc, DataTree, Galapagos), extracted from the knowledge base into the templates/ folder, with cross-references back to grasshopper_csharp_learnings.md.
 **Depends on**: Phase 2
 **Requirements**: TPL-01, TPL-02, TPL-03, TPL-04
 **Success Criteria** (what must be TRUE):
   1. Each template compiles in Rhino 8 C# Script component without modification
   2. Templates include English-only comments and correct parameter structure
   3. Templates are referenced from grasshopper_csharp_learnings.md
-**Plans**: 4 plans
+**Plans**: 3 plans
 
 Plans:
-- [ ] 03-01: Create geometry processing template
-- [ ] 03-02: Create KUKAprc toolpath template
-- [ ] 03-03: Create DataTree processing template
-- [ ] 03-04: Create Galapagos fitness template
+- [ ] 03-01-PLAN.md — Create geometry processing + KUKAprc toolpath templates (TPL-01, TPL-02)
+- [ ] 03-02-PLAN.md — Create DataTree processing + Galapagos fitness templates (TPL-03, TPL-04)
+- [ ] 03-03-PLAN.md — Add cross-reference links from knowledge base to template files
 
 ---
 *Roadmap created: 2026-03-23*
