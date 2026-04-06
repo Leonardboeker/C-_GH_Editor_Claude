@@ -811,6 +811,7 @@ for (int i = 0; i < brep.Faces.Count; i++)
 | brep.GetArea() | double | Total surface area |
 | brep.GetVolume() | double | Volume (only valid if IsSolid) |
 | brep.GetBoundingBox(true) | BoundingBox | World-axis bounding box |
+| brep.Faces[0].DuplicateFace(false).GetBoundingBox(true) | BoundingBox | Correct trimmed-face bbox — face.GetBoundingBox(true) returns UNTRIMMED bounds (confirmed RhinoCommon bug) |
 
 ---
 
@@ -2354,3 +2355,69 @@ Outputs: fitness (single number).
 4. NaN guard: Always include -- even if your formula "cannot" produce NaN, edge cases in geometry operations can
 5. Integer genes for binary choices: Use Integer Slider 0-1, map in script
 6. Penalty values: Use a large number (999999) not double.MaxValue (MaxValue can cause overflow in Galapagos internals)
+
+---
+
+## CONFIRMED API PITFALLS
+
+### BoundingBox — X/Y/Z are NOT Interval properties
+
+`BoundingBox` does NOT have `.X`, `.Y`, `.Z` properties. These do not exist in RhinoCommon.
+
+```csharp
+// WRONG — CS1061 compile error
+double width = bbox.X.Length;
+double height = bbox.Y.Length;
+
+// CORRECT
+double width  = bbox.Max.X - bbox.Min.X;
+double height = bbox.Max.Y - bbox.Min.Y;
+double depth  = bbox.Max.Z - bbox.Min.Z;
+```
+
+The only correct way to get span in an axis is `Max.X - Min.X` etc.
+
+### GH Script component cross-boundary types
+
+Custom classes CANNOT cross C# Script component assembly boundaries in GH.
+Each script compiles into a separate anonymous assembly. Even identical class definitions
+are incompatible types at runtime.
+
+Use only native .NET types for inter-component wires:
+- `Dictionary<string, object>` for structured data
+- `List<string>`, `List<double>`, `List<int>` for collections
+- `string`, `double`, `int`, `bool` for primitives
+
+```csharp
+// WRONG — ToolDef class defined in component A is not the same type in component B
+// ToolDef tool = toolDB as ToolDef;  // always null
+
+// CORRECT — use Dictionary<string, object> as wire format
+var db = toolDB as Dictionary<string, object>;
+```
+
+### BrepFace.CreateExtrusion takes a Curve path, NOT a Vector3d
+
+```csharp
+// WRONG -- CS1503 type mismatch
+// Brep vol = face.CreateExtrusion(new Vector3d(0, 0, -10), true);
+
+// CORRECT -- pass a LineCurve from origin along the extrusion direction
+Vector3d extDir   = new Vector3d(0, 0, -depth);
+LineCurve extPath = new LineCurve(new Line(Point3d.Origin, Point3d.Origin + extDir));
+Brep vol = face.CreateExtrusion(extPath, true);
+```
+
+### BrepFace.GetBoundingBox returns UNTRIMMED bounds
+
+`BrepFace.GetBoundingBox(true)` returns the bounding box of the UNTRIMMED underlying surface,
+not the trimmed face. This is a confirmed RhinoCommon bug.
+
+```csharp
+// WRONG — returns untrimmed surface bounds
+BoundingBox bb = face.GetBoundingBox(true);
+
+// CORRECT — duplicate as single-face Brep first
+Brep singleFace = face.DuplicateFace(false);
+BoundingBox bb = singleFace.GetBoundingBox(true);
+```
