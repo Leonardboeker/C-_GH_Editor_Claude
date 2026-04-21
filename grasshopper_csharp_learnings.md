@@ -1,4 +1,4 @@
-# Grasshopper C# Scripting -- Key Learnings
+^ # Grasshopper C# Scripting -- Key Learnings
 
 ## 1. Script Structure
 
@@ -2421,3 +2421,468 @@ BoundingBox bb = face.GetBoundingBox(true);
 Brep singleFace = face.DuplicateFace(false);
 BoundingBox bb = singleFace.GetBoundingBox(true);
 ```
+
+---
+
+### Brep.CreateFromExtrusion does NOT exist (use Surface.CreateExtrusion instead)
+
+`Brep.CreateFromExtrusion` is not available in all Rhino versions and causes a compile error
+"'Brep' does not contain a definition for 'CreateFromExtrusion'".
+
+The reliable approach for ALL Rhino 7/8 versions: create the side surface with
+`Surface.CreateExtrusion`, add two planar caps with `Brep.CreatePlanarBreps`, then join
+everything with `Brep.JoinBreps`.
+
+```csharp
+// WRONG -- does not exist in many Rhino builds
+// Brep extruded = Brep.CreateFromExtrusion(profileCrv, extrusionVec);
+
+// CORRECT -- works in Rhino 7 and 8
+double tol = (RhinoDoc.ActiveDoc != null) ? RhinoDoc.ActiveDoc.ModelAbsoluteTolerance : 0.01;
+
+// 1. Side surface
+Surface extrSurf = Surface.CreateExtrusion(profileCrv, extrusionVec);
+if (extrSurf == null) { /* handle error */ }
+Brep sideFace = extrSurf.ToBrep();
+
+// 2. Bottom cap at original profile position
+Brep[] bottomCaps = Brep.CreatePlanarBreps(profileCrv, tol);
+
+// 3. Top cap at extruded position
+Curve topProfile = profileCrv.DuplicateCurve();
+topProfile.Transform(Transform.Translation(extrusionVec));
+Brep[] topCaps = Brep.CreatePlanarBreps(topProfile, tol);
+
+// 4. Join into one closed solid
+List<Brep> parts = new List<Brep>();
+parts.Add(sideFace);
+if (bottomCaps != null)
+    for (int k = 0; k < bottomCaps.Length; k++) parts.Add(bottomCaps[k]);
+if (topCaps != null)
+    for (int k = 0; k < topCaps.Length; k++) parts.Add(topCaps[k]);
+
+Brep[] joined = Brep.JoinBreps(parts, tol);
+Brep extruded = (joined != null && joined.Length > 0) ? joined[0] : null;
+```
+
+Notes:
+- `profileCrv` must be a closed planar NurbsCurve (use `poly.ToNurbsCurve()` from a closed Polyline)
+- `extrusionVec` is a `Vector3d` pointing in the extrusion direction with magnitude = thickness
+- `Brep.CreatePlanarBreps` returns `null` if the curve is not planar or not closed -- always null-check
+- `Brep.JoinBreps` returns `null` if the Breps cannot be joined (e.g. gaps larger than tol)
+
+---
+
+### Largest face identification via AreaMassProperties
+
+To find the outer face (largest flat face) of an extruded Brep:
+
+```csharp
+int outerFaceIndex = -1;
+double maxArea = -1.0;
+for (int k = 0; k < brep.Faces.Count; k++)
+{
+    AreaMassProperties amp = AreaMassProperties.Compute(brep.Faces[k]);
+    if (amp == null) continue;
+    if (amp.Area > maxArea) { maxArea = amp.Area; outerFaceIndex = k; }
+}
+BrepFace outerFace = brep.Faces[outerFaceIndex];
+
+// Get outer face plane (pre-declare -- no out var)
+Plane outerFacePlane;
+bool planeOk = outerFace.TryGetPlane(out outerFacePlane);
+
+// Get outer face boundary curve
+Curve outerBoundaryCrv = outerFace.OuterLoop.To3dCurve();
+
+// Get outer face centroid
+AreaMassProperties outerAmp = AreaMassProperties.Compute(outerFace);
+Point3d outerCentroid = (outerAmp != null) ? outerAmp.Centroid : Point3d.Origin;
+```
+
+For a 19mm board extruded from a polygon face, the two polygon faces will always be
+larger than the thin edge strips, so area comparison reliably picks the correct face.
+
+---
+
+### Inward extrusion + miter trim for convex polyhedra (19mm board workflow)
+
+When generating board volumes for a convex polyhedron (e.g. stone shape from face polylines),
+extrude INWARD (toward stone center) and trim each board at every shared edge via boolean difference.
+
+**Inward normal determination:**
+```csharp
+// Stone centroid = average of all face centroids
+// For each face, compute raw cross-product normal, then flip so it points INWARD:
+Vector3d toCenter = stoneCentroid - faceCentroid;
+if (Vector3d.Multiply(toCenter, norm) < 0) norm = -norm;  // flip away->inward
+// WRONG: if (Vector3d.Multiply(toCenter, norm) > 0) norm = -norm;  // that gives OUTWARD
+```
+
+**Miter cut plane derivation:**
+For face A (inward normal nA) at shared edge with face B (inward normal nB):
+- Cut plane normal: `cutNorm = (nA - nB); cutNorm.Unitize();`
+- Face A keeps the side where `(P - edgeMid) . cutNorm >= 0`
+- Remove side cutter box: `HalfSpaceBox(edgeMid, -cutNorm, big)` then `Brep.CreateBooleanDifference`
+- Verified: for 90 deg corner nA=(1,0,0), nB=(0,1,0) -> cutNorm=(0.707,-0.707,0), face A territory is x>=y (correct)
+
+**HalfSpaceBox helper** (large box on one side of a plane -- for boolean difference cutters):
+```csharp
+private Brep HalfSpaceBox(Point3d origin, Vector3d normal, double big)
+{
+  Point3d boxCenter = origin + normal * big;
+  Vector3d xAxis = Vector3d.XAxis;
+  if (Math.Abs(Vector3d.Multiply(xAxis, normal)) > 0.9) xAxis = Vector3d.YAxis;
+  xAxis = Vector3d.CrossProduct(normal, xAxis); xAxis.Unitize();
+  Vector3d yAxis = Vector3d.CrossProduct(normal, xAxis); yAxis.Unitize();
+  Plane pl = new Plane(boxCenter, xAxis, yAxis);
+  Box box = new Box(pl, new Interval(-big, big), new Interval(-big, big), new Interval(-big, big));
+  return box.ToBrep();
+}
+// big = modelBox.Diagonal.Length * 5.0 + 100.0  (must exceed entire model)
+```
+
+**FindSharedEdge helper** (segment-level match between two polylines):
+```csharp
+private bool FindSharedEdge(Polyline pA, Polyline pB, double tol, out Line edge)
+{
+  edge = new Line();
+  for (int a = 0; a < pA.SegmentCount; a++)
+  {
+    Line sA = pA.SegmentAt(a);
+    for (int b = 0; b < pB.SegmentCount; b++)
+    {
+      Line sB = pB.SegmentAt(b);
+      bool fwd = sA.From.DistanceTo(sB.From) < tol && sA.To.DistanceTo(sB.To) < tol;
+      bool rev = sA.From.DistanceTo(sB.To) < tol && sA.To.DistanceTo(sB.From) < tol;
+      if (fwd || rev) { edge = sA; return true; }
+    }
+  }
+  return false;
+}
+```
+
+**Full miter trim loop:**
+```csharp
+for (int j = 0; j < n; j++)
+{
+  if (j == i || !normalOk[j]) continue;
+  Line sharedEdge;
+  if (!FindSharedEdge(poly, faces[j], tol, out sharedEdge)) continue;
+  Vector3d nB = normals[j];
+  // CORRECT: cutNorm = nB - nA  (face i keeps the nB-nA side)
+  // WRONG:   cutNorm = nA - nB  (that removes face i's OWN material -- miter is backwards)
+  Vector3d cutNorm = nB - nA;
+  if (cutNorm.Length < 1e-6) continue;
+  cutNorm.Unitize();
+  Point3d edgeMid = sharedEdge.PointAt(0.5);
+  Brep cutter = HalfSpaceBox(edgeMid, -cutNorm, big);  // -cutNorm = nA-nB = remove side
+  Brep[] cut = Brep.CreateBooleanDifference(new Brep[] { slab }, new Brep[] { cutter }, tol);
+  if (cut != null && cut.Length > 0) { slab = cut[0]; }
+}
+```
+
+**Solid slab construction -- use Extrusion.Create, NOT Surface.CreateExtrusion + JoinBreps:**
+JoinBreps can produce open/invalid Breps that fail in boolean operations.
+Extrusion.Create with cap=true always produces a valid closed solid.
+```csharp
+// depth sign: +thickness if plane normal is already inward, -thickness if outward
+double depth = (inwardNormal aligns with plane.Normal) ? thickness : -thickness;
+Extrusion extr = Extrusion.Create(profileCrv, depth, true);  // cap=true = closed solid
+Brep slab = extr != null ? extr.ToBrep() : null;
+```
+
+---
+
+### Polyhedral panel miter joints: global inner-vertex map (correct approach)
+
+**Problem symptom:** Per-face inner vertex computation with 3-plane intersection gives "inner corners
+don't meet" (small gaps) and "cuts protrude" -- even though the math is equivalent per-face.
+
+**Root cause:** Each panel computed its inner vertex independently from different plane combinations.
+Floating-point arithmetic gives slightly different results for the same geometric point.
+
+**Correct approach (V4): build a global vertex-to-faces map and compute each inner vertex ONCE.**
+
+For a simple convex polyhedron, every vertex is shared by exactly 3 faces (A, B, C).
+Inner vertex = intersection of the 3 inner face planes:
+- Inner plane of A: `nA . p = nA . Pi + thickness`   (Pi on outer surface, nA unit inward normal)
+- Inner plane of B: `nB . p = nB . Pi + thickness`
+- Inner plane of C: `nC . p = nC . Pi + thickness`
+
+Reference point on each inner plane: `Pi + thickness * nX`
+
+```csharp
+// --- Build vertex-to-faces map ---
+Dictionary<string, List<int>> vertFaces = new Dictionary<string, List<int>>();
+Dictionary<string, Point3d>   vertPts   = new Dictionary<string, Point3d>();
+for (int i = 0; i < n; i++) {
+  if (!normalOk[i]) continue;
+  int k = faces[i].SegmentCount;
+  for (int v = 0; v < k; v++) {
+    string key = VertKey(faces[i][v]);  // Math.Round(coord, 2).ToString("F2") per axis
+    if (!vertFaces.ContainsKey(key)) { vertFaces[key] = new List<int>(); vertPts[key] = faces[i][v]; }
+    if (!vertFaces[key].Contains(i)) vertFaces[key].Add(i);
+  }
+}
+
+// --- Compute inner vertex per polyhedron vertex (once) ---
+Dictionary<string, Point3d> innerMap = new Dictionary<string, Point3d>();
+List<string> allKeys = new List<string>(vertFaces.Keys);
+for (int ki = 0; ki < allKeys.Count; ki++) {
+  string key = allKeys[ki];
+  Point3d Pi = vertPts[key];
+  List<int> fl = vertFaces[key];
+  if (fl.Count >= 3) {
+    // find 3 valid faces
+    int fA = -1, fB = -1, fC = -1;
+    for (int fi = 0; fi < fl.Count && fC < 0; fi++) {
+      int f = fl[fi]; if (!normalOk[f]) continue;
+      if (fA < 0) fA = f; else if (fB < 0) fB = f; else fC = f;
+    }
+    if (fA >= 0 && fB >= 0 && fC >= 0) {
+      Vector3d nA = normals[fA], nB = normals[fB], nC = normals[fC];
+      Point3d refA = new Point3d(Pi.X + t * nA.X, Pi.Y + t * nA.Y, Pi.Z + t * nA.Z);
+      Point3d refB = new Point3d(Pi.X + t * nB.X, Pi.Y + t * nB.Y, Pi.Z + t * nB.Z);
+      Point3d refC = new Point3d(Pi.X + t * nC.X, Pi.Y + t * nC.Y, Pi.Z + t * nC.Z);
+      Point3d iv;
+      ThreePlaneIntersect(nA, refA, nB, refB, nC, refC, out iv);
+      innerMap[key] = iv;
+    }
+  }
+}
+
+// --- Per face: gather inner vertices from map ---
+for (int i = 0; i < n; i++) {
+  int k = faces[i].SegmentCount;
+  Point3d[] innerVerts = new Point3d[k];
+  for (int v = 0; v < k; v++) {
+    string key = VertKey(faces[i][v]);
+    innerVerts[v] = innerMap.ContainsKey(key)
+      ? innerMap[key]
+      : new Point3d(faces[i][v].X + normals[i].X * t, ...);  // fallback
+  }
+  // build solid from outer + inner verts as before
+}
+```
+
+**Why inner vertices are coplanar per face:**
+Each inner vertex is on the inner plane of face i (it's always one of the 3 planes in the intersection).
+So all inner vertices for face i satisfy `nA . iv = nA . Pi + t` -- they ARE coplanar. ✓
+
+**Why side faces are planar:**
+For shared edge A-B: all 4 side-quad vertices satisfy `(nB - nA) . p = dB - dA` (miter plane). ✓
+
+**Also fix: use face centroid (not pl.Origin) for inward-normal direction check:**
+```csharp
+// WRONG -- pl.Origin may not be on the face
+// if (Vector3d.Multiply(stoneCenter - pl.Origin, norm) < 0) norm = -norm;
+
+// CORRECT -- use face centroid
+Point3d fc = PolyCentroid(faces[i]);
+if (Vector3d.Multiply(stoneCenter - fc, norm) < 0) norm = -norm;
+```
+
+---
+
+## 50. AppDomain as Rhino-Wide Shared State
+
+GH script instances are re-created on every solve -- instance fields reset.
+For sockets, threads, and caches that must survive re-evaluation, use AppDomain:
+
+```csharp
+AppDomain.CurrentDomain.SetData("MyKey_" + port, value);
+var x = AppDomain.CurrentDomain.GetData("MyKey_" + port) as MyType;
+```
+
+AppDomain lives as long as Rhino is open. Always suffix keys with port/ID to avoid collisions.
+
+---
+
+## 51. EnsureGlobalListener Pattern (UDP / TCP)
+
+Prevents port conflicts when GH re-evaluates. Pattern: check-before-create, support reset.
+
+```csharp
+void EnsureGlobalListener(int port, bool reset)
+{
+    string cKey = "Prefix_Client_" + port;
+    string dKey = "Prefix_Data_" + port;
+
+    if (reset) {
+        var old = AppDomain.CurrentDomain.GetData(cKey) as UdpClient;
+        if (old != null) { try { old.Close(); old.Dispose(); } catch { } }
+        AppDomain.CurrentDomain.SetData(cKey, null);
+        AppDomain.CurrentDomain.SetData(dKey, null);
+        return;
+    }
+
+    if (AppDomain.CurrentDomain.GetData(cKey) == null) {
+        UdpClient c = new UdpClient();
+        c.ExclusiveAddressUse = false;
+        c.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+        c.Client.Bind(new IPEndPoint(IPAddress.Any, port));
+        AppDomain.CurrentDomain.SetData(cKey, c);
+
+        Thread t = new Thread(() => {
+            IPEndPoint ep = new IPEndPoint(IPAddress.Any, 0);
+            while (true) {
+                var cur = AppDomain.CurrentDomain.GetData(cKey) as UdpClient;
+                if (cur == null || cur != c) break; // stale thread exits
+                if (cur.Available > 0) {
+                    byte[] b = cur.Receive(ref ep);
+                    AppDomain.CurrentDomain.SetData(dKey, Encoding.UTF8.GetString(b));
+                } else { Thread.Sleep(1); }
+            }
+        });
+        t.IsBackground = true; // thread dies with Rhino
+        t.Start();
+    }
+}
+```
+
+Identity check `cur != c` detects resets without needing a separate stop flag.
+
+---
+
+## 52. Momentary Pulse Pattern
+
+Data is visible for N milliseconds after receipt, then outputs null.
+Useful for event-style signals (button press, trigger, etc.).
+
+```csharp
+// In background thread on receive:
+AppDomain.CurrentDomain.SetData(tKey, DateTime.Now);
+
+// In RunScript:
+string data = AppDomain.CurrentDomain.GetData(dKey) as string;
+object timeObj = AppDomain.CurrentDomain.GetData(tKey);
+
+bool isFresh = false;
+if (timeObj != null && data != null) {
+    double ms = (DateTime.Now - (DateTime)timeObj).TotalMilliseconds;
+    if (ms < 100) isFresh = true;
+}
+
+if (isFresh) {
+    RawData = data;
+    Component.ExpireSolution(true); // forces next solve to re-check and clear
+} else {
+    RawData = null;
+}
+```
+
+`Component.ExpireSolution(true)` makes the script self-expire -- no external timer needed.
+
+---
+
+## 53. this.Iteration Guard Against Ghost Evaluations
+
+When a DataTree is connected to a GH script input, GH evaluates the script once per branch
+(Iteration 0, 1, 2...). State machines (recording, toggling) get triggered N times per frame.
+Fix: bail early on Iteration > 0 with a neutral output.
+
+```csharp
+if (this.Iteration > 0) {
+    A = new DataTree<object>(); // neutral: DataTree + empty = DataTree, no side effects
+    return;
+}
+```
+
+Only applies when the script has state logic that must fire exactly once per frame.
+
+---
+
+## 54. UR Robot TCP Binary Protocol (CB3 / e-Series)
+
+Port 30003. Packet format: 4-byte big-endian int length, then (length - 4) bytes of doubles.
+Valid packet: 1000 < packetLength <= 2500. All doubles are big-endian (reverse if IsLittleEndian).
+
+Fixed offsets (subtract 4 because the 4-byte header is already consumed):
+
+| Offset | Data            | Count |
+|--------|-----------------|-------|
+| 252    | actual_q        | 6x double (joint radians) |
+| 300    | actual_qd       | 6x double (joint velocities) |
+| 540    | actual_TCP_pose | 6x double |
+| 588    | actual_TCP_speed| 6x double |
+| 636    | actual_TCP_force| 6x double |
+| 684    | digital_inputs  | 1x double (bitmask) |
+| 756    | digital_outputs | 1x double (bitmask) |
+| 1004   | analog_io       | 4x double (AI0, AI1, AO0, AO1) |
+
+```csharp
+byte[] b = new byte[8];
+Array.Copy(buffer, offset - 4 + e * 8, b, 0, 8);
+if (BitConverter.IsLittleEndian) Array.Reverse(b);
+double val = BitConverter.ToDouble(b, 0);
+```
+
+---
+
+## 55. Camera / Tracker Coordinate Flip (MediaPipe, VR Trackers)
+
+Screen-space and optical trackers typically use Y-down, Z-depth.
+Rhino uses Y-up (right-hand). Mapping:
+
+```csharp
+// Point: swap Y<->Z, negate new Y
+new Point3d(x * scale, -z * scale, y * scale)
+
+// Plane axes (from 3 tracker vectors origin/xAxis/yAxis):
+Point3d o = new Point3d(vm[0].x * s, -vm[0].z * s, vm[0].y * s);
+Vector3d xA = new Vector3d(vm[1].x, -vm[1].z, vm[1].y);
+Vector3d yA = new Vector3d(-vm[2].x, vm[2].z, -vm[2].y);
+new Plane(o, xA, yA)
+```
+
+---
+
+## 56. Plane Serialization with InvariantCulture
+
+Always use InvariantCulture when writing/reading floats to text files.
+German locale uses comma as decimal separator -- `1.5` becomes `1,5` and Parse fails.
+
+```csharp
+var ci = System.Globalization.CultureInfo.InvariantCulture;
+// Write
+File.WriteAllLines(path, new[] {
+    plane.Origin.X.ToString(ci), plane.Origin.Y.ToString(ci), plane.Origin.Z.ToString(ci),
+    // ...
+});
+// Read
+double v = double.Parse(lines[0], ci);
+```
+
+---
+
+## 57. DataTree Recording -- Takes / Frames / Device Hierarchy
+
+For motion capture / replay: structure recorded DataTree snapshots as (device, take, frame).
+
+```csharp
+// Playback output path:
+GH_Path outPath = new GH_Path(deviceId, takeIndex, frameIndex);
+outTree.AddRange(frameData.Branch(originalPath), outPath);
+```
+
+This allows filtering by device (path[0]), selecting takes (path[1]), and scrubbing frames (path[2]).
+
+---
+
+## 58. Manual JSON Building with StringBuilder
+
+GH scripting has no Newtonsoft. Build JSON manually with StringBuilder + InvariantCulture.
+
+```csharp
+var ci = System.Globalization.CultureInfo.InvariantCulture;
+StringBuilder sb = new StringBuilder();
+sb.Append("{\"elements\":[");
+for (int i = 0; i < items.Count; i++) {
+    sb.Append("{\"x\":" + x.ToString("F2", ci) + ",\"y\":" + y.ToString("F2", ci) + "}");
+    if (i < items.Count - 1) sb.Append(",");
+}
+sb.Append("]}");
+```
+
+Use `"F2"` for coordinates (2 decimal places), `"F6"` for precision data.
