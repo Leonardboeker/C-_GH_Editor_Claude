@@ -8,13 +8,25 @@ A reference repository for writing C# scripts in the Grasshopper Script Editor (
 
 ```
 /
-├── grasshopper_csharp_learnings.md   # The main reference doc — rules, patterns, recipes
-└── templates/
-    ├── kukaprc_toolpath.cs           # Robot toolpath generation for KUKAprc
-    ├── geometry_processing.cs        # Curve/surface/brep operations with null guards
-    ├── datatree_processing.cs        # DataTree read, transform, and output patterns
-    └── galapagos_fitness.cs          # Galapagos optimization fitness function skeleton
+├── grasshopper_csharp_learnings.md        # The main reference doc -- rules, patterns, recipes
+├── templates/                             # Generic reusable templates (copy-paste starting points)
+│   ├── kukaprc_toolpath.cs                # Robot toolpath generation for KUKAprc
+│   ├── geometry_processing.cs             # Curve/surface/brep operations with null guards
+│   ├── datatree_processing.cs             # DataTree read, transform, and output patterns
+│   ├── galapagos_fitness.cs               # Galapagos optimization fitness function skeleton
+│   ├── curve_dash_pattern_V1/V2.cs        # Parametric dash/gap patterns along curves
+│   ├── panel_volume_generator_V3/V4.cs    # Panel extrusion to solid volumes
+│   ├── surface_curvature_*.cs             # Curvature analysis, heatmap, mesh colouring (V1-V4)
+│   ├── surface_flatten_*.cs               # Unroll/flatten with distortion and kink detection
+│   └── surface_kink_*.cs                  # Kink curve detection and 3D extraction
+└── projects/                              # Project-specific scripts (NOT generic templates)
+    ├── stone-panel-fabrication/           # Geometric stone -> 19mm Spanplatten workflow
+    │   ├── miter_angle_calculator.cs      # Dihedral + miter angles for shared edges
+    │   └── panel_volume_generator_V3/V4.cs
+    └── unroll-surfaces/                   # Surface unrolling pipeline scripts
 ```
+
+**Rule:** Generic reusable scripts go in `templates/`. Scripts built for a specific project go in `projects/{project-name}/`.
 
 ---
 
@@ -39,7 +51,7 @@ Each template has a header comment listing its expected inputs and outputs:
 
 ## The learnings doc
 
-`grasshopper_csharp_learnings.md` is the main reference — ~2400 lines covering everything that's non-obvious or environment-specific about writing C# in Grasshopper.
+`grasshopper_csharp_learnings.md` is the main reference — ~2700 lines covering everything that's non-obvious or environment-specific about writing C# in Grasshopper.
 
 ### Key sections:
 
@@ -75,6 +87,17 @@ out_result = result;
 **KUKAprc** — How to generate plane lists and speed lists for robot toolpath components.
 
 **Common Rhino geometry patterns** — Curve division, closest point, intersection, offset, boolean operations — all with the explicit null checks and tolerance handling the environment requires.
+
+**Networking & Real-Time patterns (patterns 50–58):**
+- `AppDomain` as Rhino-wide shared memory — keeps sockets/threads alive across GH solves
+- `EnsureGlobalListener` pattern — prevents port conflicts on re-evaluation (UDP + TCP)
+- Momentary pulse via `Component.ExpireSolution(true)` — self-clearing event signals
+- `this.Iteration > 0` guard — prevents ghost evaluations when DataTree inputs are used
+- UR Robot TCP binary protocol (CB3/e-Series) — byte offsets for joint/TCP/IO data
+- Camera/tracker coordinate flip — screen-space Y-down to Rhino Y-up mapping
+- Plane serialization with `InvariantCulture` — locale-safe float read/write
+- DataTree recording with Takes/Frames/Device hierarchy — motion capture replay structure
+- Manual JSON with `StringBuilder` — no Newtonsoft available in GH scripting
 
 ---
 
