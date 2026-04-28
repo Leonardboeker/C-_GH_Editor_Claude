@@ -585,6 +585,50 @@ SDK-Mode class including `using` statements, class declaration, and `RunScript`.
 The user pastes the entire class into the new Script Editor.
 Never output just the method body -- the new editor expects a full class.
 
+#### Failure mode if you ship body-only files (verified 2026-04-28, Living Fibers Phase 2)
+
+Body-only `.cs` files that contain just `private void RunScript(...)` (no usings,
+no class wrapper) FAIL when opened directly in the Rhino 8 Script Editor.
+Symptoms per file:
+
+- `CS0106: The modifier 'private' is not valid for this item` -- `private` is
+  illegal at top-level / global scope.
+- `CS0246: type or namespace 'X' could not be found` for every RhinoCommon /
+  Grasshopper type (`Curve`, `Point3d`, `Vector3d`, `Brep`, `Surface`, `Plane`,
+  `Arc`, `ArcCurve`, `LineCurve`, `PolylineCurve`, `Box`, `TextDot`, `List<>`,
+  `DataTree<>`, ...).
+- `CS0103: name 'Math' does not exist in the current context` -- same root
+  cause (missing `using System;`).
+
+The Rhino 8 Script Editor in SDK-Mode does NOT auto-inject usings into a file
+opened from disk. The full class wrapper carries them.
+
+#### Required header (verbatim, every script-component .cs file)
+
+```csharp
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Drawing;
+using Rhino;
+using Rhino.Geometry;
+using Grasshopper;
+using Grasshopper.Kernel;
+using Grasshopper.Kernel.Data;
+using Grasshopper.Kernel.Types;
+
+public class Script_Instance : GH_ScriptInstance
+{
+  private void RunScript(/* typed inputs */, ref object A, ref object B)
+  {
+    // null guards, work, output
+  }
+}
+```
+
+Keep all 10 usings even if the script only needs 3 -- the cost of an unused
+using is zero, the cost of a missing one is a broken paste.
+
 ---
 
 ## 20. Curve Operations
