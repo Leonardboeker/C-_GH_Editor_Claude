@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Surface Growth Triangulation - Wiring Diagram</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #f5f3eb;
+    color: #2a2a2a;
+    padding: 20px;
+    min-height: 100vh;
+  }
+  h1 {
+    font-size: 24px;
+    margin-bottom: 8px;
+    color: #1a1a1a;
+  }
+  .subtitle {
+    color: #666;
+    margin-bottom: 24px;
+    font-size: 14px;
+  }
+  .legend {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    font-size: 12px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .legend-box {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 1.5px solid #2a2a2a;
+  }
+  .geo { background: #e8d4a8; }
+  .slider { background: #d9d9d9; }
+  .toggle { background: #b8b8b8; }
+  .csharp { background: #a08bc4; color: white; }
+  .native { background: #c9c8c5; }
+  .galapagos { background: #ff4488; color: white; }
+  .output { background: #88c97a; color: white; }
+
+  .diagram-container {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    overflow-x: auto;
+  }
+  svg {
+    display: block;
+    margin: 0 auto;
+  }
+
+  .node-label {
+    font-weight: 700;
+    font-size: 13px;
+    font-family: Georgia, serif;
+    font-style: italic;
+  }
+  .port-label {
+    font-size: 11px;
+    font-family: monospace;
+  }
+  .wire-label {
+    font-size: 10px;
+    font-family: monospace;
+    fill: #666;
+  }
+  .annotation {
+    font-size: 11px;
+    fill: #888;
+    font-style: italic;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    font-size: 13px;
+  }
+  th, td {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  th {
+    background: #f0ede4;
+    font-weight: 600;
+  }
+  code {
+    font-family: 'Consolas', 'Monaco', monospace;
+    background: #f5f3eb;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+  }
+  .section {
+    margin-top: 32px;
+  }
+  .section h2 {
+    font-size: 18px;
+    margin-bottom: 12px;
+    color: #1a1a1a;
+    border-bottom: 2px solid #a08bc4;
+    padding-bottom: 4px;
+    display: inline-block;
+  }
+</style>
+</head>
+<body>
+
+<h1>Surface Growth Triangulation — Wiring Diagram</h1>
+<div class="subtitle">Grasshopper Setup für Poisson-Disk + Delaunay + Galapagos-Optimierung</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-box geo"></div><span>Geometrie</span></div>
+  <div class="legend-item"><div class="legend-box slider"></div><span>Number Slider</span></div>
+  <div class="legend-item"><div class="legend-box toggle"></div><span>Boolean Toggle</span></div>
+  <div class="legend-item"><div class="legend-box csharp"></div><span>C# Script</span></div>
+  <div class="legend-item"><div class="legend-box native"></div><span>GH Native</span></div>
+  <div class="legend-item"><div class="legend-box galapagos"></div><span>Galapagos</span></div>
+  <div class="legend-item"><div class="legend-box output"></div><span>Final Output</span></div>
+</div>
+
+<div class="diagram-container">
+<svg width="1600" height="1080" viewBox="0 0 1600 1080" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Definitions -->
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#444"/>
+    </marker>
+    <marker id="arrowgreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#3a9c2f"/>
+    </marker>
+    <marker id="arrowpink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#ff4488"/>
+    </marker>
+    <marker id="arrowblue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#3366cc"/>
+    </marker>
+  </defs>
+
+  <!-- PHASE A: GEOMETRY PIPELINE (top left) -->
+  <text x="40" y="30" class="annotation" font-size="13" font-weight="bold" fill="#666">PHASE A — Surface erzeugen</text>
+
+  <!-- Circle -->
+  <g>
+    <rect x="40" y="50" width="120" height="60" rx="6" fill="#e8d4a8" stroke="#2a2a2a" stroke-width="1.5"/>
+    <text x="100" y="78" class="node-label" text-anchor="middle">Circle</text>
+    <circle cx="60" cy="95" r="3" fill="#2a2a2a"/>
+    <text x="70" y="100" class="port-label">R</text>
+    <circle cx="160" cy="80" r="3" fill="#2a2a2a"/>
+    <text x="138" y="84" class="port-label">C →</text>
+  </g>
+
+  <!-- Loft -->
+  <g>
+    <rect x="220" y="50" width="120" height="60" rx="6" fill="#e8d4a8" stroke="#2a2a2a" stroke-width="1.5"/>
+    <text x="280" y="78" class="node-label" text-anchor="middle">Loft</text>
+    <circle cx="220" cy="80" r="3" fill="#2a2a2a"/>
+    <text x="226" y="84" class="port-label">C</text>
+    <circle cx="340" cy="80" r="3" fill="#2a2a2a"/>
+    <text x="318" y="84" class="port-label">L →</text>
+  </g>
+
+  <!-- Surface (param container) -->
+  <g>
+    <rect x="400" y="50" width="120" height="60" rx="6" fill="#e8d4a8" stroke="#2a2a2a" stroke-width="1.5"/>
+    <text x="460" y="78" class="node-label" text-anchor="middle">Surface</text>
+    <circle cx="400" cy="80" r="3" fill="#2a2a2a"/>
+    <text x="520" cy="80" class="port-label"></text>
+    <circle cx="520" cy="80" r="3" fill="#2a2a2a"/>
+  </g>
+
+  <!-- Wires geo -->
+  <path d="M 160 80 C 190 80, 190 80, 220 80" stroke="#444" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <path d="M 340 80 C 370 80, 370 80, 400 80" stroke="#444" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- ============================== -->
+  <!-- PHASE B: SLIDERS (left side) -->
+  <text x="40" y="160" class="annotation" font-size="13" font-weight="bold" fill="#666">PHASE B — Galapagos Genes</text>
+
+  <!-- Sliders -->
+  <g>
+    <rect x="40" y="180" width="240" height="42" rx="4" fill="#d9d9d9" stroke="#2a2a2a" stroke-width="1.5"/>
+    <text x="50" y="200" class="port-label" font-weight="bold">target_count</text>
+    <text x="50" y="215" class="annotation">int slider  10 — 500</text>
+    <circle cx="280" cy="201" r="3" fill="#2a2a2a"/>
+  </g>
+  <g>
+    <rect x="40" y="232" width="240" height="42" rx="4" fill="#d9d9d9" stroke="#2a2a2a" stroke-width="1.5"/>
+    <text x="50" y="252" class="port-label" font-weight="bold">min_dist</text>
+    <text x="50" y="267" class="annotation">double slider  0.01 — 0.20</text>
+    <circle cx="280" cy="253" r="3" fill="#2a2a2a"/>
+  </g>
+  <g>
+    <rect x="40" y="284" width="240" height="42" rx="4" fill="#d9d9d9" stroke="#2a2a2a" stroke-width="1.5"/>
+    <text x="50" y="304" class="port-label" font-weight="bold">curvature_bias</text>
+    <text x="50" y="319" class="annotation">double slider  0.0 — 1.0</text>
+    <circle cx="280" cy="305" r="3" fill="#2a2a2a"/>
+  </g>
+  <g>
+    <rect x="40" y="336" width="240" height="42" rx="4" fill="#d9d9d9" stroke="#2a2a2a" stroke-width="1.5"/>
+    <text x="50" y="356" class="port-label" font-weight="bold">relax_iter</text>
+    <text x="50" y="371" class="annotation">int slider  0 — 50</text>
+    <circle cx="280" cy="357" r="3" fill="#2a2a2a"/>
+  </g>
+  <g>
+    <rect x="40" y="388" width="240" height="42" rx="4" fill="#d9d9d9" stroke="#2a2a2a" stroke-width="1.5"/>
+    <text x="50" y="408" class="port-label" font-weight="bold">random_seed</text>
+    <text x="50" y="423" class="annotation">int slider  0 — 9999</text>
+    <circle cx="280" cy="409" r="3" fill="#2a2a2a"/>
+  </g>
+
+  <!-- Toggle -->
+  <g>
+    <rect x="40" y="440" width="240" height="42" rx="4" fill="#b8b8b8" stroke="#2a2a2a" stroke-width="1.5"/>
+    <text x="50" y="460" class="port-label" font-weight="bold">wrap_u</text>
+    <text x="50" y="475" class="annotation">boolean toggle  TRUE für Schlauch</text>
+    <circle cx="280" cy="461" r="3" fill="#2a2a2a"/>
+  </g>
+
+  <!-- ============================== -->
+  <!-- C# SCRIPT (center) -->
+  <g>
+    <rect x="500" y="170" width="320" height="320" rx="8" fill="#a08bc4" stroke="#2a2a2a" stroke-width="2"/>
+    <text x="660" y="200" class="node-label" text-anchor="middle" fill="white">C# Script</text>
+    <text x="660" y="220" class="port-label" text-anchor="middle" fill="#f0e8ff">surface_growth_triangulation</text>
+
+    <!-- Inputs left -->
+    <circle cx="500" cy="245" r="3.5" fill="white"/>
+    <text x="510" y="249" class="port-label" fill="white">surface</text>
+    <circle cx="500" cy="275" r="3.5" fill="white"/>
+    <text x="510" y="279" class="port-label" fill="white">target_count</text>
+    <circle cx="500" cy="305" r="3.5" fill="white"/>
+    <text x="510" y="309" class="port-label" fill="white">min_dist</text>
+    <circle cx="500" cy="335" r="3.5" fill="white"/>
+    <text x="510" y="339" class="port-label" fill="white">curvature_bias</text>
+    <circle cx="500" cy="365" r="3.5" fill="white"/>
+    <text x="510" y="369" class="port-label" fill="white">relax_iter</text>
+    <circle cx="500" cy="395" r="3.5" fill="white"/>
+    <text x="510" y="399" class="port-label" fill="white">random_seed</text>
+    <circle cx="500" cy="425" r="3.5" fill="white"/>
+    <text x="510" y="429" class="port-label" fill="white">wrap_u</text>
+
+    <!-- Outputs right -->
+    <circle cx="820" cy="245" r="3.5" fill="white"/>
+    <text x="810" y="249" class="port-label" text-anchor="end" fill="white">out_points_3d</text>
+    <circle cx="820" cy="280" r="3.5" fill="white"/>
+    <text x="810" y="284" class="port-label" text-anchor="end" fill="white">out_points_uv</text>
+    <circle cx="820" cy="315" r="3.5" fill="white"/>
+    <text x="810" y="319" class="port-label" text-anchor="end" fill="white">out_fitness</text>
+    <circle cx="820" cy="350" r="3.5" fill="white"/>
+    <text x="810" y="354" class="port-label" text-anchor="end" fill="white">out_edge_lengths</text>
+    <circle cx="820" cy="385" r="3.5" fill="white"/>
+    <text x="810" y="389" class="port-label" text-anchor="end" fill="white">info</text>
+  </g>
+
+  <!-- Slider wires to C# -->
+  <path d="M 280 201 C 390 201, 390 245, 500 245" stroke="#444" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+  <path d="M 280 201 C 390 201, 390 275, 500 275" stroke="#444" stroke-width="1.5" fill="none" marker-end="url(#arrow)" stroke-dasharray="0"/>
+  <path d="M 280 253 C 390 253, 390 305, 500 305" stroke="#444" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+  <path d="M 280 305 C 390 305, 390 335, 500 335" stroke="#444" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+  <path d="M 280 357 C 390 357, 390 365, 500 365" stroke="#444" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+  <path d="M 280 409 C 390 409, 390 395, 500 395" stroke="#444" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+  <path d="M 280 461 C 390 461, 390 425, 500 425" stroke="#444" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- target_count to C# corrected -->
+  <path d="M 280 201 C 390 201, 390 275, 500 275" stroke="#444" stroke-width="0" fill="none"/>
+
+  <!-- Surface wire to C# -->
+  <path d="M 520 80 C 580 80, 580 245, 500 245" stroke="#444" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- ============================== -->
+  <!-- PHASE C: DELAUNAY (right side) -->
+  <text x="900" y="160" class="annotation" font-size="13" font-weight="bold" fill="#666">PHASE C — Triangulation</text>
+
+  <!-- XY Plane helper -->
+  <g>
+    <rect x="900" y="180" width="120" height="50" rx="6" fill="#c9c8c5" stroke="#2a2a2a" stroke-width="1.5"/>
+    <text x="960" y="200" class="node-label" text-anchor="middle">XY Plane</text>
+    <text x="960" y="218" class="port-label" text-anchor="middle">(at Origin)</text>
+    <circle cx="1020" cy="205" r="3" fill="#2a2a2a"/>
+    <text x="998" y="209" class="port-label">P →</text>
+  </g>
+
+  <!-- Delaunay Mesh -->
+  <g>
+    <rect x="1080" y="260" width="180" height="80" rx="6" fill="#c9c8c5" stroke="#2a2a2a" stroke-width="1.5"/>
+    <text x="1170" y="290" class="node-label" text-anchor="middle">Delaunay Mesh</text>
+    <circle cx="1080" cy="305" r="3" fill="#2a2a2a"/>
+    <text x="1090" y="309" class="port-label">P (points)</text>
+    <circle cx="1080" cy="325" r="3" fill="#2a2a2a"/>
+    <text x="1090" y="329" class="port-label">Pl (plane)</text>
+    <circle cx="1260" cy="300" r="3" fill="#2a2a2a"/>
+    <text x="1250" y="304" class="port-label" text-anchor="end">M →</text>
+  </g>
+
+  <!-- C# out_points_uv -> Delaunay P -->
+  <path d="M 820 280 C 950 280, 950 305, 1080 305" stroke="#3366cc" stroke-width="2" fill="none" marker-end="url(#arrowblue)"/>
+  <text x="900" y="270" class="wire-label">out_points_uv (UV-2D)</text>
+
+  <!-- XY Plane -> Delaunay Pl -->
+  <path d="M 1020 205 C 1050 205, 1050 325, 1080 325" stroke="#444" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- Deconstruct Mesh -->
+  <g>
+    <rect x="1340" y="260" width="180" height="100" rx="6" fill="#c9c8c5" stroke="#2a2a2a" stroke-width="1.5"/>
+    <text x="1430" y="290" class="node-label" text-anchor="middle">Deconstruct Mesh</text>
+    <circle cx="1340" cy="310" r="3" fill="#2a2a2a"/>
+    <text x="1350" y="314" class="port-label">M</text>
+    <circle cx="1520" cy="290" r="3" fill="#2a2a2a"/>
+    <text x="1510" y="294" class="port-label" text-anchor="end">V</text>
+    <circle cx="1520" cy="310" r="3" fill="#2a2a2a"/>
+    <text x="1510" y="314" class="port-label" text-anchor="end">F →</text>
+    <circle cx="1520" cy="330" r="3" fill="#2a2a2a"/>
+    <text x="1510" y="334" class="port-label" text-anchor="end">C</text>
+    <circle cx="1520" cy="350" r="3" fill="#2a2a2a"/>
+    <text x="1510" y="354" class="port-label" text-anchor="end">N</text>
+  </g>
+
+  <!-- Delaunay M -> Deconstruct M -->
+  <path d="M 1260 300 C 1300 300, 1300 310, 1340 310" stroke="#444" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <text x="1275" y="295" class="wire-label">Mesh (UV)</text>
+
+  <!-- ============================== -->
+  <!-- Construct Mesh -->
+  <g>
+    <rect x="1080" y="500" width="180" height="80" rx="6" fill="#c9c8c5" stroke="#2a2a2a" stroke-width="1.5"/>
+    <text x="1170" y="530" class="node-label" text-anchor="middle">Construct Mesh</text>
+    <circle cx="1080" cy="545" r="3" fill="#2a2a2a"/>
+    <text x="1090" y="549" class="port-label">V (3D vertices)</text>
+    <circle cx="1080" cy="565" r="3" fill="#2a2a2a"/>
+    <text x="1090" y="569" class="port-label">F (faces)</text>
+    <circle cx="1260" cy="540" r="3" fill="#2a2a2a"/>
+    <text x="1250" y="544" class="port-label" text-anchor="end">M →</text>
+  </g>
+
+  <!-- C# out_points_3d -> Construct V -->
+  <path d="M 820 245 C 950 245, 950 545, 1080 545" stroke="#3366cc" stroke-width="2" fill="none" marker-end="url(#arrowblue)"/>
+  <text x="900" y="450" class="wire-label">out_points_3d (3D-Punkte)</text>
+
+  <!-- Deconstruct F -> Construct F -->
+  <path d="M 1520 310 C 1560 310, 1560 565, 1080 565" stroke="#3a9c2f" stroke-width="2" fill="none" marker-end="url(#arrowgreen)"/>
+  <text x="1340" y="430" class="wire-label" fill="#3a9c2f">Faces (Topologie)</text>
+
+  <!-- Final mesh -->
+  <g>
+    <rect x="1340" y="500" width="180" height="80" rx="6" fill="#88c97a" stroke="#2a2a2a" stroke-width="2"/>
+    <text x="1430" y="535" class="node-label" text-anchor="middle" fill="white">FINAL 3D MESH</text>
+    <text x="1430" y="555" class="port-label" text-anchor="middle" fill="white">(your tube triangulated)</text>
+    <circle cx="1340" cy="540" r="3" fill="white"/>
+  </g>
+
+  <!-- Construct M -> Final -->
+  <path d="M 1260 540 C 1300 540, 1300 540, 1340 540" stroke="#444" stroke-width="2.5" fill="none" marker-end="url(#arrow)"/>
+
+  <!-- ============================== -->
+  <!-- PHASE D: GALAPAGOS -->
+  <text x="40" y="600" class="annotation" font-size="13" font-weight="bold" fill="#666">PHASE D — Galapagos Optimierung</text>
+
+  <g>
+    <rect x="400" y="620" width="260" height="120" rx="8" fill="#ff4488" stroke="#2a2a2a" stroke-width="2"/>
+    <text x="530" y="650" class="node-label" text-anchor="middle" fill="white" font-size="16">GALAPAGOS</text>
+    <text x="530" y="668" class="port-label" text-anchor="middle" fill="white">Mode: MINIMIZE</text>
+
+    <circle cx="400" cy="695" r="4" fill="white"/>
+    <text x="410" y="699" class="port-label" fill="white" font-weight="bold">Genome</text>
+    <text x="410" y="713" class="port-label" fill="#ffd0e0" font-size="9">← alle 5 Sliders</text>
+
+    <circle cx="400" cy="730" r="4" fill="white"/>
+    <text x="410" y="734" class="port-label" fill="white" font-weight="bold">Fitness</text>
+  </g>
+
+  <!-- 5 slider wires to Galapagos Genome (curved) -->
+  <path d="M 280 201 C 340 201, 340 695, 400 695" stroke="#ff4488" stroke-width="1.5" fill="none" marker-end="url(#arrowpink)" stroke-dasharray="4,3"/>
+  <path d="M 280 253 C 350 253, 350 695, 400 695" stroke="#ff4488" stroke-width="1.5" fill="none" marker-end="url(#arrowpink)" stroke-dasharray="4,3"/>
+  <path d="M 280 305 C 360 305, 360 695, 400 695" stroke="#ff4488" stroke-width="1.5" fill="none" marker-end="url(#arrowpink)" stroke-dasharray="4,3"/>
+  <path d="M 280 357 C 370 357, 370 695, 400 695" stroke="#ff4488" stroke-width="1.5" fill="none" marker-end="url(#arrowpink)" stroke-dasharray="4,3"/>
+  <path d="M 280 409 C 380 409, 380 695, 400 695" stroke="#ff4488" stroke-width="1.5" fill="none" marker-end="url(#arrowpink)" stroke-dasharray="4,3"/>
+
+  <!-- C# out_fitness -> Galapagos Fitness -->
+  <path d="M 820 315 C 870 600, 700 800, 400 730" stroke="#ff4488" stroke-width="2.5" fill="none" marker-end="url(#arrowpink)"/>
+  <text x="700" y="800" class="wire-label" fill="#ff4488" font-weight="bold">out_fitness → MINIMIZE</text>
+
+  <!-- ============================== -->
+  <!-- ANNOTATIONS / TIPS BOX -->
+  <g>
+    <rect x="900" y="620" width="620" height="220" rx="8" fill="#fffaef" stroke="#cc9900" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="920" y="650" font-size="14" font-weight="bold" fill="#996600">⚙ Setup-Tipps</text>
+
+    <text x="920" y="678" font-size="12" fill="#2a2a2a">
+      <tspan x="920" dy="0" font-weight="bold">1.</tspan>
+      <tspan x="940" dy="0">Rechtsklick auf Integer-Sliders → "Integers Only" aktivieren</tspan>
+    </text>
+    <text x="920" y="700" font-size="12" fill="#2a2a2a">
+      <tspan x="920" dy="0" font-weight="bold">2.</tspan>
+      <tspan x="940" dy="0">XY Plane braucht NUR den Origin Input (Default ist 0,0,0)</tspan>
+    </text>
+    <text x="920" y="722" font-size="12" fill="#2a2a2a">
+      <tspan x="920" dy="0" font-weight="bold">3.</tspan>
+      <tspan x="940" dy="0">Delaunay Mesh: Pl-Input = XY Plane für 2D-Delaunay im UV-Raum</tspan>
+    </text>
+    <text x="920" y="744" font-size="12" fill="#2a2a2a">
+      <tspan x="920" dy="0" font-weight="bold">4.</tspan>
+      <tspan x="940" dy="0">"V" Output von Deconstruct Mesh wird VERWORFEN (UV-Vertices)</tspan>
+    </text>
+    <text x="920" y="766" font-size="12" fill="#2a2a2a">
+      <tspan x="920" dy="0" font-weight="bold">5.</tspan>
+      <tspan x="940" dy="0">Construct Mesh: V = echte 3D-Punkte aus C#, F = Faces aus Deconstruct</tspan>
+    </text>
+    <text x="920" y="788" font-size="12" fill="#2a2a2a">
+      <tspan x="920" dy="0" font-weight="bold">6.</tspan>
+      <tspan x="940" dy="0">Galapagos: Doppelklick → Solvers → "Evolutionary" → Start</tspan>
+    </text>
+    <text x="920" y="810" font-size="12" fill="#2a2a2a">
+      <tspan x="920" dy="0" font-weight="bold">7.</tspan>
+      <tspan x="940" dy="0">Mode auf MINIMIZE (low fitness = uniforme Punktverteilung)</tspan>
+    </text>
+    <text x="920" y="832" font-size="11" fill="#996600" font-style="italic">
+      <tspan x="920" dy="0">→ Laufzeit 5-15 min für gute Ergebnisse</tspan>
+    </text>
+  </g>
+
+  <!-- ============================== -->
+  <!-- Color key for wires -->
+  <g transform="translate(40, 880)">
+    <text x="0" y="0" font-size="14" font-weight="bold" fill="#666">Wire-Farben:</text>
+    <line x1="120" y1="-4" x2="180" y2="-4" stroke="#444" stroke-width="2"/>
+    <text x="190" y="0" font-size="12">Standard (Daten)</text>
+    <line x1="120" y1="20" x2="180" y2="20" stroke="#3366cc" stroke-width="2"/>
+    <text x="190" y="24" font-size="12">Punkt-Listen (UV/3D)</text>
+    <line x1="120" y1="44" x2="180" y2="44" stroke="#3a9c2f" stroke-width="2"/>
+    <text x="190" y="48" font-size="12">Mesh-Topologie (Faces)</text>
+    <line x1="400" y1="-4" x2="460" y2="-4" stroke="#ff4488" stroke-width="2"/>
+    <text x="470" y="0" font-size="12">Galapagos (Fitness)</text>
+    <line x1="400" y1="20" x2="460" y2="20" stroke="#ff4488" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <text x="470" y="24" font-size="12">Galapagos (Genome, parallel zu C#)</text>
+  </g>
+
+  <!-- Data flow direction indicator -->
+  <g transform="translate(40, 1010)">
+    <text x="0" y="0" font-size="14" font-weight="bold" fill="#666">Datenfluss:</text>
+    <text x="120" y="0" font-size="13" fill="#444">Phase A → Phase B → Phase C → Phase D</text>
+    <text x="120" y="22" font-size="11" fill="#888" font-style="italic">Surface erzeugen → Sliders + C# → Delaunay → Galapagos optimiert</text>
+  </g>
+
+</svg>
+</div>
+
+<div class="section">
+<h2>Komponenten-Übersicht</h2>
+<table>
+<thead>
+<tr>
+  <th>#</th>
+  <th>Komponente</th>
+  <th>GH-Pfad</th>
+  <th>Was sie tut</th>
+</tr>
+</thead>
+<tbody>
+<tr><td>1</td><td><code>Circle</code></td><td>Curve → Primitive</td><td>Erzeugt Profilkreis(e) für den Schlauch</td></tr>
+<tr><td>2</td><td><code>Loft</code></td><td>Surface → Freeform</td><td>Verbindet mehrere Kreise zur Schlauch-Fläche</td></tr>
+<tr><td>3</td><td><code>Surface</code> Param</td><td>Params → Geometry</td><td>Optional — als Container für die Loft-Output</td></tr>
+<tr><td>4</td><td>5× <code>Number Slider</code></td><td>Params → Input</td><td>Galapagos-Gene: target_count, min_dist, curvature_bias, relax_iter, random_seed</td></tr>
+<tr><td>5</td><td><code>Boolean Toggle</code></td><td>Params → Input</td><td>wrap_u — TRUE bei Schlauch (geschlossen in U)</td></tr>
+<tr><td>6</td><td><code>C# Script</code></td><td>Math → Script</td><td>Poisson-Disk Sampling + Lloyd Relaxation + Fitness</td></tr>
+<tr><td>7</td><td><code>XY Plane</code></td><td>Vector → Plane</td><td>Bezugsebene für 2D-Delaunay im UV-Raum</td></tr>
+<tr><td>8</td><td><code>Delaunay Mesh</code></td><td>Mesh → Triangulation</td><td>Triangulation der UV-Punkte (2D)</td></tr>
+<tr><td>9</td><td><code>Deconstruct Mesh</code></td><td>Mesh → Analysis</td><td>Extrahiert Vertices (verworfen) und Faces (= Topologie)</td></tr>
+<tr><td>10</td><td><code>Construct Mesh</code></td><td>Mesh → Primitive</td><td>Baut Mesh neu mit 3D-Vertices + Delaunay-Faces</td></tr>
+<tr><td>11</td><td><code>Galapagos</code></td><td>Params → Util</td><td>Optimiert die 5 Slider auf minimale Fitness</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="section">
+<h2>Slider Konfiguration</h2>
+<table>
+<thead>
+<tr><th>Slider</th><th>Min</th><th>Max</th><th>Default</th><th>Type</th><th>Galapagos</th></tr>
+</thead>
+<tbody>
+<tr><td><code>target_count</code></td><td>10</td><td>500</td><td>50</td><td>Integer</td><td>Gene</td></tr>
+<tr><td><code>min_dist</code></td><td>0.01</td><td>0.20</td><td>0.05</td><td>Decimal</td><td>Gene</td></tr>
+<tr><td><code>curvature_bias</code></td><td>0.0</td><td>1.0</td><td>0.0</td><td>Decimal</td><td>Gene</td></tr>
+<tr><td><code>relax_iter</code></td><td>0</td><td>50</td><td>10</td><td>Integer</td><td>Gene</td></tr>
+<tr><td><code>random_seed</code></td><td>0</td><td>9999</td><td>0</td><td>Integer</td><td>Gene</td></tr>
+</tbody>
+</table>
+<p style="margin-top:8px; font-size:12px; color:#666;">
+Für Integer-Sliders: Rechtsklick auf Slider → <code>Integers Only</code> ✓
+</p>
+</div>
+
+<div class="section">
+<h2>Datenfluss-Logik</h2>
+<table>
+<thead>
+<tr><th>Phase</th><th>Was passiert</th><th>Schlüsselverbindung</th></tr>
+</thead>
+<tbody>
+<tr><td><b>A</b></td><td>Schlauch-Surface aus Loft</td><td><code>Loft.L → C#.surface</code></td></tr>
+<tr><td><b>B</b></td><td>5 Sliders + Toggle füttern das C#</td><td>Sliders gehen <b>parallel</b> in C# UND Galapagos.Genome</td></tr>
+<tr><td><b>C</b></td><td>UV-Delaunay → Topologie → 3D-Mesh</td><td><code>out_points_uv → Delaunay.P</code>, dann <code>Deconstruct.F → Construct.F</code></td></tr>
+<tr><td><b>D</b></td><td>Galapagos minimiert Fitness</td><td><code>C#.out_fitness → Galapagos.Fitness</code></td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="section">
+<h2>Galapagos Workflow</h2>
+<ol style="line-height: 1.8; padding-left: 24px;">
+<li>Doppelklick auf die Galapagos-Komponente → Editor-Fenster öffnet sich</li>
+<li>Tab <b>Solvers</b> → wähle <code>Evolutionary Solver</code></li>
+<li>Tab <b>Options</b>:
+  <ul style="margin-top: 4px;">
+    <li>Time Limit: <code>0:15:00</code> (15 Minuten)</li>
+    <li>Population: <code>50</code></li>
+    <li>Initial Boost: <code>2.0</code></li>
+    <li>Maintain: <code>5%</code></li>
+    <li>Inbreeding: <code>+75%</code></li>
+  </ul>
+</li>
+<li>Klick <b>Start Solver</b> — Galapagos beginnt die Sliders zu variieren</li>
+<li>Beobachte: Fitness sollte sinken (niedriger = uniformere Punktverteilung)</li>
+<li>Nach Abschluss: Klick auf das beste Genome in der History → Sliders bleiben auf den optimalen Werten</li>
+</ol>
+</div>
+
+</body>
+</html>
