@@ -32,8 +32,31 @@ These are the most common failure points. Full details in `grasshopper_csharp_le
 - **Platform:** Rhino 8 / Grasshopper (desktop CAD, not web)
 - **Language:** C# only (no Python scripts)
 - **Target:** Rhino 8 Script component (new Roslyn-based editor, full class visible)
-- **Knowledge base:** `grasshopper_csharp_learnings.md` (32 sections, 2300+ lines)
-- **Templates:** `templates/` folder (geometry, KUKAprc, DataTree, Galapagos)
+- **Knowledge base:** `grasshopper_csharp_learnings.md` (always check this first)
+- **Generic templates:** `templates/` folder (geometry, KUKAprc, DataTree, Galapagos)
+- **Project-specific scripts:** `projects/{project-name}/` subfolders
+
+## Folder Rules (ALWAYS enforce)
+
+| Script type | Where it goes |
+|---|---|
+| Generic reusable template | `templates/` |
+| Script for a specific project | `projects/{project-name}/` |
+
+**ALWAYS save to BOTH locations** — every script gets written to `templates/` AND `projects/{project-name}/`.
+
+Examples:
+- `geometry_processing.cs` → `templates/` AND `projects/{name}/`
+- `miter_angle_calculator.cs` for stone fabrication → `templates/` AND `projects/stone-panel-fabrication/`
+- When writing scripts for a new project, ALWAYS create `projects/{project-name}/` first
+
+## Auto-Learning Rule (ALWAYS enforce)
+
+**When a bug or workaround is discovered, immediately add it to `grasshopper_csharp_learnings.md`.**
+
+Trigger: any compile error, runtime error, or API mismatch that required a code change.
+Format: add under the relevant section (or at the end) following the existing WRONG/CORRECT pattern.
+Do this BEFORE responding to the user — the learnings file is the source of truth.
 
 ## GSD Workflow
 For scripting tasks in this project, use these commands:

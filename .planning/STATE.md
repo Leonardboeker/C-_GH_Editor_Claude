@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
+milestone: v2.0
+milestone_name: Geometric Stone Panel Fabrication Workflow
 status: unknown
-last_updated: "2026-03-23T12:31:47.686Z"
+last_updated: "2026-04-11T22:53:26.736Z"
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 11
-  completed_plans: 11
+  total_phases: 7
+  completed_phases: 4
+  total_plans: 12
+  completed_plans: 12
 ---
 
 # STATE.md — GH C# Editor Toolkit
@@ -18,11 +18,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Every C# script Claude writes runs correctly in Rhino 8 Grasshopper on the first try
-**Current focus:** All phases complete -- v1.0 milestone done
+**Current focus:** Phase 04 — Panel Volume Generator
 
 ## Current Phase
 
-All phases complete.
+Phase 4: Panel Volume Generator — Plan 01 complete (panel_volume_generator.cs written).
 
 ## Completed Phases
 
@@ -52,6 +52,9 @@ All phases complete.
 - [Phase 03]: Extracted templates verbatim from learnings.md sections 29-30 -- no modifications
 - [Phase 03]: Extracted DataTree and Galapagos templates verbatim from learnings.md sections 31-32 with added header comments
 - [Phase 03]: Cross-references use 'Standalone file:' pattern linking knowledge base sections 29-32 to templates/*.cs files
+- [Phase 04-01]: Largest-area BrepFace used as outer-face proxy -- always the original polygon, smaller than extrusion side caps
+- [Phase 04-01]: Stone centroid approximated as average of face centroids -- sufficient for outward-normal flip without full mesh input
+- [Phase 04-01]: PolyCentroid helper uses 1e-6 hardcoded tolerance rather than doc tolerance to avoid RhinoDoc dependency in helper
 
 ## Performance Metrics
 
@@ -68,8 +71,9 @@ All phases complete.
 | 03 | 01 | 2min | 2 | 2 |
 | 03 | 02 | 2min | 2 | 2 |
 | 03 | 03 | 1min | 1 | 1 |
+| 04 | 01 | 4min | 1 | 1 |
 
 ## Last Action
 
-Completed 03-03-PLAN.md (cross-reference links) -- 2026-03-23T12:27:00Z
-All 11 plans complete. v1.0 milestone done.
+Completed 04-01-PLAN.md (panel_volume_generator.cs) -- 2026-04-11T23:00:00Z
+Phase 4 Plan 01 complete. templates/panel_volume_generator.cs written.

@@ -29,7 +29,31 @@
 - [x] **TPL-03**: DataTree processing template (path iteration, branching output, filtering)
 - [x] **TPL-04**: Galapagos fitness template (NaN guard, single number output)
 
-## v2 Requirements
+## v2.0 Requirements — Stone Panel Fabrication (new milestone)
+
+### Panel Geometry
+
+- [x] **PNL-01**: Panel volume generator accepts face polylines + thickness, outputs one closed 19mm Brep per face
+- [x] **PNL-02**: Outer face (largest flat face, original polyline face) is identified per panel and output as plane + boundary curve
+
+### Labeling
+
+- [ ] **LBL-01**: Panel labeler accepts gradient (List<Color>), prefix (string), start index (int)
+- [ ] **LBL-02**: Each panel receives a name stored in brep.UserDictionary["PartName"] (e.g. "P_01")
+- [ ] **LBL-03**: Gradient color is index-interpolated across the panel list
+- [ ] **LBL-04**: Label position is the centroid of the outer face; label string = name
+
+### Grid Layout
+
+- [ ] **GRD-01**: Grid layout orients each panel so outer face faces -Z (CNC table orientation)
+- [ ] **GRD-02**: Grid uses configurable column count and spacing; outputs flat outline curves at Z=0
+
+### DYNESTIC Integration
+
+- [ ] **HOP-01**: Bridge script outputs outer-face boundary curve at Z=0 for HopPart `outline` input
+- [ ] **HOP-02**: Bridge script outputs dx, dy, dz (bounding box) and partName for HopExport header
+
+## v3 Requirements
 
 ### Extended Knowledge
 
@@ -55,9 +79,16 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| KB-01 | Phase 1 | Complete (01-01) |
-| KB-02-KB-04 | Phase 1 | Pending |
-| KB-05 | Phase 1 | Complete (01-01) |
+| KB-01 | Phase 1 | Complete |
+| KB-02-KB-04 | Phase 1 | Complete |
+| KB-05 | Phase 1 | Complete |
+| KB-06-KB-08 | Phase 1 | Complete |
+| CL-01-CL-03 | Phase 2 | Complete |
+| TPL-01-TPL-04 | Phase 3 | Complete |
+| PNL-01, PNL-02 | Phase 4 | Pending |
+| LBL-01-LBL-04 | Phase 5 | Pending |
+| GRD-01, GRD-02 | Phase 6 | Pending |
+| HOP-01, HOP-02 | Phase 7 | Pending |
 | KB-06–KB-08 | Phase 1 | Pending |
 | CL-01–CL-03 | Phase 2 | Pending |
 | TPL-01–TPL-04 | Phase 3 | Pending |

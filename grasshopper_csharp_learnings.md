@@ -1,5 +1,10 @@
 ^ # Grasshopper C# Scripting -- Key Learnings
 
+> **DETAIL file.** For day-to-day reference, hand the assistant
+> `grasshopper_csharp_learnings_INDEX.md` instead -- it inlines the cascade-fail
+> rules and points back here for deep topics. Load specific sections of THIS
+> file only when the index pointer says so.
+
 ## 1. Script Structure
 
 Every GH C# script in Rhino 8 follows this exact structure.
@@ -602,6 +607,14 @@ Symptoms per file:
 
 The Rhino 8 Script Editor in SDK-Mode does NOT auto-inject usings into a file
 opened from disk. The full class wrapper carries them.
+
+Re-confirmed 2026-04-29 (HRC-W31 robot outward path planner): same 46-error
+cascade, identical signatures (`CS0106` on every `private` member, `CS0246` on
+every Rhino/GH type, `CS0103` on `Math`). Root cause was that the assistant
+shipped only the `private void RunScript(...)` block plus helper methods --
+no `using`, no class. This is a recurring assistant failure mode, not a Rhino
+behaviour. Before producing any GH C# script, the assistant MUST verify the
+header below is in place.
 
 #### Required header (verbatim, every script-component .cs file)
 
